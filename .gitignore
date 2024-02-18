@@ -1,0 +1,7 @@
+*.swp
+build/*
+generated/*
+*.cmake
+bgrtmp*
+test.py
+
