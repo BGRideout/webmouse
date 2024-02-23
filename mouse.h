@@ -17,10 +17,11 @@ private:
     int8_t          dx_;
     int8_t          dy_;
     uint8_t         buttons_;
+    int8_t          wheel_;
 
     static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size);
     void mousing_can_send_now(void);
-    void send_report(uint8_t buttons, int8_t dx, int8_t dy);
+    void send_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel);
 
     static MOUSE        *singleton_;            // Singleton mouse instance pointer
 
@@ -31,7 +32,7 @@ public:
     bool init(async_context_t *context);
     bool is_connectd() const { return hid_cid != 0; }
 
-    void action(int8_t dx, int8_t dy, uint8_t buttons);
+    void action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel);
 };
 
 #endif

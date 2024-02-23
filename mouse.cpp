@@ -167,6 +167,7 @@ uint8_t MOUSE::hid_descriptor_mouse_boot_mode[50] = {
     0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
     0x09, 0x30,                    //     USAGE (X)
     0x09, 0x31,                    //     USAGE (Y)
+    //0x09, 0x38,                    //     USAGE(Wheel)
     0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
     0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
     0x75, 0x08,                    //     REPORT_SIZE (8)
@@ -178,25 +179,27 @@ uint8_t MOUSE::hid_descriptor_mouse_boot_mode[50] = {
 };
 
 // HID Report sending
-void MOUSE::send_report(uint8_t buttons, int8_t dx, int8_t dy){
-    uint8_t report[] = { 0xa1, buttons, (uint8_t) dx, (uint8_t) dy};
+void MOUSE::send_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel){
+    uint8_t report[] = { 0xa1, buttons, (uint8_t) dx, (uint8_t) dy /*, (uint8_t)wheel */};
     hid_device_send_interrupt_message(hid_cid, &report[0], sizeof(report));
-    printf("Mouse: %d/%d - buttons: %02x\n", dx, dy, buttons);
+    printf("Mouse: %d/%d - buttons: %02x - wheel %d\n", dx, dy, buttons, wheel);
 }
 
 void MOUSE::mousing_can_send_now(void)
 {
-    send_report(buttons_, dx_, dy_);
+    send_report(buttons_, dx_, dy_, wheel_);
     // reset
     dx_ = 0;
     dy_ = 0;
+    wheel_ = 0;
 }
 
-void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons)
+void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
 {
     dx_ += dx;
     dy_ += dy;
     buttons_ = buttons;
+    wheel_ += wheel;
     hid_device_request_can_send_now_event(hid_cid);
 }
 

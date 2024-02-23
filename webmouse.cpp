@@ -78,10 +78,10 @@ static void stdin_process(char character)
         default:
             return;
     }
-    mouse->action(dx, dy, buttons);
+    mouse->action(dx, dy, buttons, 0);
     if (buttons != 0)
     {
-        mouse->action(0, 0, 0);
+        mouse->action(0, 0, 0, 0);
     }
 }
 
@@ -100,6 +100,7 @@ void web_message(const std::string &msg)
     int8_t dx = 0;
     int8_t dy = 0;
     uint8_t buttons = 0;
+    int8_t wheel;
 
     std::vector<std::string> tok;
     TXT::split(msg, " ", tok);
@@ -153,9 +154,13 @@ void web_message(const std::string &msg)
                 buttons |= 2;
             }
         }
+        else if (name == "w")
+        {
+            wheel = value;
+        }
     }
 
-    mouse->action(dx, dy, buttons);
+    mouse->action(dx, dy, buttons, wheel);
 }
 
 int main(int argc, const char *argv[])
