@@ -46,6 +46,7 @@
  */
 // *****************************************************************************
 
+#include "mouse.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -61,229 +62,25 @@
 #include "btstack_stdin.h"
 #endif
 
-// to enable demo text on POSIX systems
-// #undef HAVE_BTSTACK_STDIN
+MOUSE *MOUSE::singleton_ = nullptr;
 
-static uint8_t hid_service_buffer[250];
-static const char hid_device_name[] = "BTstack HID Mouse";
-static btstack_packet_callback_registration_t hci_event_callback_registration;
-static uint16_t hid_cid;
+MOUSE::MOUSE() : hid_cid(0), hid_boot_device(0), dx_(0), dy_(0), buttons_(0)
+{
 
-// from USB HID Specification 1.1, Appendix B.2
-const uint8_t hid_descriptor_mouse_boot_mode[] = {
-    0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-    0x09, 0x02,                    // USAGE (Mouse)
-    0xa1, 0x01,                    // COLLECTION (Application)
-
-    0x09, 0x01,                    //   USAGE (Pointer)
-    0xa1, 0x00,                    //   COLLECTION (Physical)
-
-    0x05, 0x09,                    //     USAGE_PAGE (Button)
-    0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
-    0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
-    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-    0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
-    0x95, 0x03,                    //     REPORT_COUNT (3)
-    0x75, 0x01,                    //     REPORT_SIZE (1)
-    0x81, 0x02,                    //     INPUT (Data,Var,Abs)
-    0x95, 0x01,                    //     REPORT_COUNT (1)
-    0x75, 0x05,                    //     REPORT_SIZE (5)
-    0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
-
-    0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
-    0x09, 0x30,                    //     USAGE (X)
-    0x09, 0x31,                    //     USAGE (Y)
-    0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
-    0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
-    0x75, 0x08,                    //     REPORT_SIZE (8)
-    0x95, 0x02,                    //     REPORT_COUNT (2)
-    0x81, 0x06,                    //     INPUT (Data,Var,Rel)
-
-    0xc0,                          //   END_COLLECTION
-    0xc0                           // END_COLLECTION
-};
-
-// HID Report sending
-static void send_report(uint8_t buttons, int8_t dx, int8_t dy){
-    uint8_t report[] = { 0xa1, buttons, (uint8_t) dx, (uint8_t) dy};
-    hid_device_send_interrupt_message(hid_cid, &report[0], sizeof(report));
-    printf("Mouse: %d/%d - buttons: %02x\n", dx, dy, buttons);
 }
 
-static int dx;
-static int dy;
-static uint8_t buttons;
-static int hid_boot_device = 0;
-
-static void mousing_can_send_now(void){
-    send_report(buttons, dx, dy);
-    // reset
-    dx = 0;
-    dy = 0;
-    if (buttons){
-        buttons = 0;
-        hid_device_request_can_send_now_event(hid_cid);
+MOUSE *MOUSE::get()
+{
+    if (!singleton_)
+    {
+        singleton_ = new MOUSE();
     }
+    return singleton_;
 }
 
-// Demo Application
-
-#ifdef HAVE_BTSTACK_STDIN
-
-static const int MOUSE_SPEED = 8;
-
-// On systems with STDIN, we can directly type on the console
-
-static void stdin_process(char character){
-
-    if (!hid_cid) {
-        printf("Mouse not connected, ignoring '%c'\n", character);
-        return;
-    }
-
-    switch (character){
-        case 'a':
-            dx -= MOUSE_SPEED;
-            break;
-        case 's':
-            dy += MOUSE_SPEED;
-            break;
-        case 'd':
-            dx += MOUSE_SPEED;
-            break;
-        case 'w':
-            dy -= MOUSE_SPEED;
-            break;
-        case 'l':
-            buttons |= 1;
-            break;
-        case 'r':
-            buttons |= 2;
-            break;
-        default:
-            return;
-    }
-    hid_device_request_can_send_now_event(hid_cid);
-}
-
-#else
-
-// On embedded systems, simulate clicking on 4 corners of a square
-
-#define MOUSE_PERIOD_MS 15
-
-static int step;
-static const int STEPS_PER_DIRECTION = 50;
-static const int MOUSE_SPEED = 10;
-
-static struct {
-    int dx;
-    int dy;
-} directions[] = {
-    {  1,  0 },
-    {  0,  1 },
-    { -1,  0 },
-    {  0, -1 },
-};
-
-static btstack_timer_source_t mousing_timer;
-
-static void mousing_timer_handler(btstack_timer_source_t * ts){
-
-    if (!hid_cid) return;
-
-    // simulate left click when corner reached
-    if (step % STEPS_PER_DIRECTION == 0){
-        buttons |= 1;
-    }
-    // simulate move
-    int direction_index = step / STEPS_PER_DIRECTION;
-    dx += directions[direction_index].dx * MOUSE_SPEED;
-    dy += directions[direction_index].dy * MOUSE_SPEED;
-
-    // next
-    step++;
-    if (step >= STEPS_PER_DIRECTION * 4) {
-        step = 0;
-    }
-
-    // trigger send
-    hid_device_request_can_send_now_event(hid_cid);
-
-    // set next timer
-    btstack_run_loop_set_timer(ts, MOUSE_PERIOD_MS);
-    btstack_run_loop_add_timer(ts);
-}
-
-static void hid_embedded_start_mousing(void){
-    printf("Start mousing..\n");
-
-    step = 0;
-
-    // set one-shot timer
-    mousing_timer.process = &mousing_timer_handler;
-    btstack_run_loop_set_timer(&mousing_timer, MOUSE_PERIOD_MS);
-    btstack_run_loop_add_timer(&mousing_timer);
-}
-#endif
-
-static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size){
-    UNUSED(channel);
-    UNUSED(packet_size);
-    switch (packet_type){
-        case HCI_EVENT_PACKET:
-            switch (hci_event_packet_get_type(packet)){
-                case HCI_EVENT_USER_CONFIRMATION_REQUEST:
-                    // ssp: inform about user confirmation request
-                    log_info("SSP User Confirmation Request with numeric value '%06" PRIu32 "'\n", hci_event_user_confirmation_request_get_numeric_value(packet));
-                    log_info("SSP User Confirmation Auto accept\n");
-                    break;
-
-                case HCI_EVENT_HID_META:
-                    switch (hci_event_hid_meta_get_subevent_code(packet)){
-                        case HID_SUBEVENT_CONNECTION_OPENED:
-                            if (hid_subevent_connection_opened_get_status(packet) != ERROR_CODE_SUCCESS) return;
-                            hid_cid = hid_subevent_connection_opened_get_hid_cid(packet);
-#ifdef HAVE_BTSTACK_STDIN
-                            printf("HID Connected, control mouse using 'a','s',''d', 'w' keys for movement and 'l' and 'r' for buttons...\n");
-#else
-                            printf("HID Connected, simulating mouse movements...\n");
-                            hid_embedded_start_mousing();
-#endif
-                            break;
-                        case HID_SUBEVENT_CONNECTION_CLOSED:
-                            printf("HID Disconnected\n");
-                            hid_cid = 0;
-                            break;
-                        case HID_SUBEVENT_CAN_SEND_NOW:
-                            mousing_can_send_now();
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                default:
-                    break;
-            }
-            break;
-        default:
-            break;
-    }
-}
-
-/* @section Main Application Setup
- *
- * @text Listing MainConfiguration shows main application code.
- * To run a HID Device service you need to initialize the SDP, and to create and register HID Device record with it.
- * At the end the Bluetooth stack is started.
- */
-
-/* LISTING_START(MainConfiguration): Setup HID Device */
-
-int btstack_main(int argc, const char * argv[]);
-int btstack_main(int argc, const char * argv[]){
-    (void)argc;
-    (void)argv;
+bool MOUSE::init(async_context_t *context)
+{
+    //btstack_run_loop_async_context_get_instance(context);
 
     // allow to get found by inquiry
     gap_discoverable_control(1);
@@ -340,13 +137,114 @@ int btstack_main(int argc, const char * argv[]){
     // register for HID
     hid_device_register_packet_handler(&packet_handler);
 
-#ifdef HAVE_BTSTACK_STDIN
-    btstack_stdin_setup(stdin_process);
-#endif
     // turn on!
     hci_power_control(HCI_POWER_ON);
     return 0;
 }
+
+
+// from USB HID Specification 1.1, Appendix B.2
+uint8_t MOUSE::hid_descriptor_mouse_boot_mode[50] = {
+    0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+    0x09, 0x02,                    // USAGE (Mouse)
+    0xa1, 0x01,                    // COLLECTION (Application)
+
+    0x09, 0x01,                    //   USAGE (Pointer)
+    0xa1, 0x00,                    //   COLLECTION (Physical)
+
+    0x05, 0x09,                    //     USAGE_PAGE (Button)
+    0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
+    0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
+    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+    0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+    0x95, 0x03,                    //     REPORT_COUNT (3)
+    0x75, 0x01,                    //     REPORT_SIZE (1)
+    0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+    0x95, 0x01,                    //     REPORT_COUNT (1)
+    0x75, 0x05,                    //     REPORT_SIZE (5)
+    0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
+
+    0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
+    0x09, 0x30,                    //     USAGE (X)
+    0x09, 0x31,                    //     USAGE (Y)
+    0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
+    0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
+    0x75, 0x08,                    //     REPORT_SIZE (8)
+    0x95, 0x02,                    //     REPORT_COUNT (2)
+    0x81, 0x06,                    //     INPUT (Data,Var,Rel)
+
+    0xc0,                          //   END_COLLECTION
+    0xc0                           // END_COLLECTION
+};
+
+// HID Report sending
+void MOUSE::send_report(uint8_t buttons, int8_t dx, int8_t dy){
+    uint8_t report[] = { 0xa1, buttons, (uint8_t) dx, (uint8_t) dy};
+    hid_device_send_interrupt_message(hid_cid, &report[0], sizeof(report));
+    printf("Mouse: %d/%d - buttons: %02x\n", dx, dy, buttons);
+}
+
+void MOUSE::mousing_can_send_now(void)
+{
+    send_report(buttons_, dx_, dy_);
+    // reset
+    dx_ = 0;
+    dy_ = 0;
+}
+
+void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons)
+{
+    dx_ += dx;
+    dy_ += dy;
+    buttons_ = buttons;
+    hid_device_request_can_send_now_event(hid_cid);
+}
+
+void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size){
+    UNUSED(channel);
+    UNUSED(packet_size);
+    MOUSE *mouse = get();
+    switch (packet_type){
+        case HCI_EVENT_PACKET:
+            switch (hci_event_packet_get_type(packet)){
+                case HCI_EVENT_USER_CONFIRMATION_REQUEST:
+                    // ssp: inform about user confirmation request
+                    log_info("SSP User Confirmation Request with numeric value '%06" PRIu32 "'\n", hci_event_user_confirmation_request_get_numeric_value(packet));
+                    log_info("SSP User Confirmation Auto accept\n");
+                    break;
+
+                case HCI_EVENT_HID_META:
+                    switch (hci_event_hid_meta_get_subevent_code(packet)){
+                        case HID_SUBEVENT_CONNECTION_OPENED:
+                            if (hid_subevent_connection_opened_get_status(packet) != ERROR_CODE_SUCCESS) return;
+                            mouse->hid_cid = hid_subevent_connection_opened_get_hid_cid(packet);
+#ifdef HAVE_BTSTACK_STDIN
+                            printf("HID Connected, control mouse using arrow keys for movement and 'l' and 'r' for buttons...\n");
+#else
+                            printf("HID Connected, simulating mouse movements...\n");
+                            hid_embedded_start_mousing();
+#endif
+                            break;
+                        case HID_SUBEVENT_CONNECTION_CLOSED:
+                            printf("HID Disconnected\n");
+                            mouse->hid_cid = 0;
+                            break;
+                        case HID_SUBEVENT_CAN_SEND_NOW:
+                            mouse->mousing_can_send_now();
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 /* LISTING_END */
 /* EXAMPLE_END */
 
