@@ -91,7 +91,6 @@ err_t WEB::tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
     WEB *web = (WEB *)arg;
     if (!p)
     {
-        printf("Null buffer from %p\n", tpcb);
         web->close_client(tpcb);
         return ERR_OK;
     }
@@ -138,7 +137,6 @@ err_t WEB::tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
 
 err_t WEB::tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 {
-    printf("Sent %d bytes to %p\n", len, tpcb);
     WEB *web = (WEB *)arg;
     web->write_next(tpcb);
     return ERR_OK;
@@ -146,7 +144,6 @@ err_t WEB::tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 
 err_t WEB::send_buffer(struct tcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate)
 {
-    printf("sending %d bytes to %p\n", buflen, client_pcb);
     auto ci = clients_.find(client_pcb);
     if (ci != clients_.end())
     {
@@ -163,7 +160,6 @@ err_t WEB::write_next(tcp_pcb *client_pcb)
     if (ci != clients_.end())
     {
         u16_t nn = tcp_sndbuf(client_pcb);
-        printf("Can send %d to %p\n", nn, client_pcb);
         if (nn > TCP_MSS)
         {
             nn = TCP_MSS;
@@ -172,7 +168,6 @@ err_t WEB::write_next(tcp_pcb *client_pcb)
         u16_t buflen;
         if (ci->second.get_next(nn, &buffer, &buflen))
         {
-            printf("Writing %d\n", buflen);
             cyw43_arch_lwip_begin();
             cyw43_arch_lwip_check();
             err = tcp_write(client_pcb, buffer, buflen, 0);
@@ -209,7 +204,6 @@ void WEB::process_rqst(struct tcp_pcb *client_pcb)
         for (int ii = 0; ii < lines.size(); ii++)
         {
             TXT::trim_back(lines[ii]);
-            printf("%2.2d (%2.2d) : %s\n", ii, lines.at(ii).length(), lines.at(ii).c_str());
         }
 
         if (!ci->second.isWebSocket())
@@ -219,7 +213,6 @@ void WEB::process_rqst(struct tcp_pcb *client_pcb)
             {
                 ok = true;
                 std::string url = tokens.at(1);
-                printf("GET URL: %s\n", url.c_str());
                 if (url == "/")
                 {
                     send_home_page(client_pcb);
@@ -584,7 +577,6 @@ void WEB::process_websocket(struct tcp_pcb *client_pcb)
         switch (opc)
         {
         case WEBSOCKET_OPCODE_TEXT:
-            printf("Websocket request from %p: opc=%d len=%d data=%s\n", client_pcb, opc, payload.length(), payload.c_str());
             if (message_callback_)
             {
                 message_callback_(payload);
@@ -596,7 +588,6 @@ void WEB::process_websocket(struct tcp_pcb *client_pcb)
             break;
 
         case WEBSOCKET_OPCODE_CLOSE:
-            printf("Close websocket request from %p\n", client_pcb);
             send_websocket(client_pcb, WEBSOCKET_OPCODE_CLOSE, payload);
             close_client(client_pcb);
             break;

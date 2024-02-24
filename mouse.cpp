@@ -58,13 +58,15 @@
 
 #include "btstack.h"
 
-#ifdef HAVE_BTSTACK_STDIN
-#include "btstack_stdin.h"
-#endif
+#include "ble/gatt-service/battery_service_server.h"
+#include "ble/gatt-service/device_information_service_server.h"
+#include "ble/gatt-service/hids_device.h"
+
+#include "mouse_att.h"
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
-MOUSE::MOUSE() : hid_cid(0), hid_boot_device(0), dx_(0), dy_(0), buttons_(0)
+MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), dx_(0), dy_(0), buttons_(0), wheel_(0)
 {
 
 }
@@ -80,118 +82,133 @@ MOUSE *MOUSE::get()
 
 bool MOUSE::init(async_context_t *context)
 {
-    //btstack_run_loop_async_context_get_instance(context);
-
-    // allow to get found by inquiry
-    gap_discoverable_control(1);
-    // use Limited Discoverable Mode; Peripheral; Pointing Device as CoD
-    gap_set_class_of_device(0x2580);
-    // set local name to be identified - zeroes will be replaced by actual BD ADDR
-    gap_set_local_name("HID Mouse Demo 00:00:00:00:00:00");
-    // allow for role switch in general and sniff mode
-    gap_set_default_link_policy_settings( LM_LINK_POLICY_ENABLE_ROLE_SWITCH | LM_LINK_POLICY_ENABLE_SNIFF_MODE );
-    // allow for role switch on outgoing connections - this allow HID Host to become master when we re-connect to it
-    gap_set_allow_role_switch(true);
-
-    // L2CAP
+    // setup l2cap and
     l2cap_init();
 
-#ifdef ENABLE_BLE
-    // Initialize LE Security Manager. Needed for cross-transport key derivation
+    // setup SM: Display only
     sm_init();
-#endif
+    sm_set_io_capabilities(IO_CAPABILITY_DISPLAY_ONLY);
+    // sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
+    sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
 
-    // SDP Server
-    sdp_init();
-    memset(hid_service_buffer, 0, sizeof(hid_service_buffer));
-    
-    uint8_t hid_virtual_cable = 0;
-    uint8_t hid_remote_wake = 1;
-    uint8_t hid_reconnect_initiate = 1;
-    uint8_t hid_normally_connectable = 1;
+    // setup ATT server
+    att_server_init(profile_data, NULL, NULL);
 
-    hid_sdp_record_t hid_params = {
-        // hid sevice subclass 2580 Mouse, hid counntry code 33 US
-        0x2580, 33, 
-        hid_virtual_cable, hid_remote_wake, 
-        hid_reconnect_initiate,
-        (hid_normally_connectable != 0),
-        (hid_boot_device != 0), 
-        0xFFFF, 0xFFFF, 3200,
-        hid_descriptor_mouse_boot_mode,
-        sizeof(hid_descriptor_mouse_boot_mode), 
-        hid_device_name
+    // setup battery service
+    battery_service_server_init(battery_);
+
+    // setup device information service
+    device_information_service_server_init();
+
+    // setup HID Device service
+    // from USB HID Specification 1.1, Appendix B.2
+    static uint8_t hid_descriptor_mouse[] =
+    {
+        0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
+        0x09, 0x02,                    // USAGE (Mouse)
+        0xa1, 0x01,                    // COLLECTION (Application)
+
+        0x85, 0x01,                    // Report ID 1
+        0x09, 0x01,                    //   USAGE (Pointer)
+        0xa1, 0x00,                    //   COLLECTION (Physical)
+
+        0x05, 0x09,                    //     USAGE_PAGE (Button)
+        0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
+        0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
+        0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
+        0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x75, 0x01,                    //     REPORT_SIZE (1)
+        0x81, 0x02,                    //     INPUT (Data,Var,Abs)
+        0x95, 0x01,                    //     REPORT_COUNT (1)
+        0x75, 0x05,                    //     REPORT_SIZE (5)
+        0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
+
+        0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
+        0x09, 0x30,                    //     USAGE (X)
+        0x09, 0x31,                    //     USAGE (Y)
+        0x09, 0x38,                    //     USAGE(Wheel)
+        0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
+        0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
+        0x75, 0x08,                    //     REPORT_SIZE (8)
+        0x95, 0x03,                    //     REPORT_COUNT (3)
+        0x81, 0x06,                    //     INPUT (Data,Var,Rel)
+
+        0xc0,                          //   END_COLLECTION
+        0xc0                           // END_COLLECTION
     };
-    
-    hid_create_sdp_record(hid_service_buffer, 0x10001, &hid_params);
+    hids_device_init(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse));
 
-    printf("SDP service record size: %u\n", de_get_len( hid_service_buffer));
-    sdp_register_service(hid_service_buffer);
+    // setup advertisements
+    static uint8_t adv_data[] =
+    {
+        // Flags general discoverable, BR/EDR not supported
+        0x02, BLUETOOTH_DATA_TYPE_FLAGS, 0x06,
+        // Name
+        0x0a, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME, 'W', 'e', 'b', ' ', 'M', 'o', 'u', 's', 'e',
+        // 16-bit Service UUIDs
+        0x03, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, ORG_BLUETOOTH_SERVICE_HUMAN_INTERFACE_DEVICE & 0xff, ORG_BLUETOOTH_SERVICE_HUMAN_INTERFACE_DEVICE >> 8,
+        // Appearance HID - Mouse (Category 15, Sub-Category 2)
+        0x03, BLUETOOTH_DATA_TYPE_APPEARANCE, 0xC2, 0x03,
+    };
+    uint8_t adv_data_len = sizeof(adv_data);
 
-    // HID Device
-    hid_device_init(hid_boot_device, sizeof(hid_descriptor_mouse_boot_mode), hid_descriptor_mouse_boot_mode);
-    // register for HCI events
+    uint16_t adv_int_min = 0x0030;
+    uint16_t adv_int_max = 0x0030;
+    uint8_t adv_type = 0;
+    bd_addr_t null_addr;
+    memset(null_addr, 0, 6);
+    gap_advertisements_set_params(adv_int_min, adv_int_max, adv_type, 0, null_addr, 0x07, 0x00);
+    gap_advertisements_set_data(adv_data_len, (uint8_t*) adv_data);
+    gap_advertisements_enable(1);
+
+    // register for events
     hci_event_callback_registration.callback = &packet_handler;
     hci_add_event_handler(&hci_event_callback_registration);
 
-    // register for HID
-    hid_device_register_packet_handler(&packet_handler);
+    // register for connection parameter updates
+    l2cap_event_callback_registration.callback = &packet_handler;
+    l2cap_add_event_handler(&l2cap_event_callback_registration);
 
-    // turn on!
+    sm_event_callback_registration.callback = &packet_handler;
+    sm_add_event_handler(&sm_event_callback_registration);
+
+    hids_device_register_packet_handler(packet_handler);
+
     hci_power_control(HCI_POWER_ON);
     return 0;
 }
 
 
-// from USB HID Specification 1.1, Appendix B.2
-uint8_t MOUSE::hid_descriptor_mouse_boot_mode[50] = {
-    0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
-    0x09, 0x02,                    // USAGE (Mouse)
-    0xa1, 0x01,                    // COLLECTION (Application)
 
-    0x09, 0x01,                    //   USAGE (Pointer)
-    0xa1, 0x00,                    //   COLLECTION (Physical)
-
-    0x05, 0x09,                    //     USAGE_PAGE (Button)
-    0x19, 0x01,                    //     USAGE_MINIMUM (Button 1)
-    0x29, 0x03,                    //     USAGE_MAXIMUM (Button 3)
-    0x15, 0x00,                    //     LOGICAL_MINIMUM (0)
-    0x25, 0x01,                    //     LOGICAL_MAXIMUM (1)
-    0x95, 0x03,                    //     REPORT_COUNT (3)
-    0x75, 0x01,                    //     REPORT_SIZE (1)
-    0x81, 0x02,                    //     INPUT (Data,Var,Abs)
-    0x95, 0x01,                    //     REPORT_COUNT (1)
-    0x75, 0x05,                    //     REPORT_SIZE (5)
-    0x81, 0x03,                    //     INPUT (Cnst,Var,Abs)
-
-    0x05, 0x01,                    //     USAGE_PAGE (Generic Desktop)
-    0x09, 0x30,                    //     USAGE (X)
-    0x09, 0x31,                    //     USAGE (Y)
-    //0x09, 0x38,                    //     USAGE(Wheel)
-    0x15, 0x81,                    //     LOGICAL_MINIMUM (-127)
-    0x25, 0x7f,                    //     LOGICAL_MAXIMUM (127)
-    0x75, 0x08,                    //     REPORT_SIZE (8)
-    0x95, 0x02,                    //     REPORT_COUNT (2)
-    0x81, 0x06,                    //     INPUT (Data,Var,Rel)
-
-    0xc0,                          //   END_COLLECTION
-    0xc0                           // END_COLLECTION
-};
 
 // HID Report sending
 void MOUSE::send_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel){
-    uint8_t report[] = { 0xa1, buttons, (uint8_t) dx, (uint8_t) dy /*, (uint8_t)wheel */};
-    hid_device_send_interrupt_message(hid_cid, &report[0], sizeof(report));
-    printf("Mouse: %d/%d - buttons: %02x - wheel %d\n", dx, dy, buttons, wheel);
+    uint8_t report[] = { buttons, (uint8_t) dx, (uint8_t) dy, (uint8_t)wheel};
+    switch (protocol_mode)
+    {
+        case 0:
+            hids_device_send_boot_mouse_input_report(con_handle, report, sizeof(report) - 1);
+            break;
+        case 1:
+            hids_device_send_input_report(con_handle, report, sizeof(report));
+            break;
+        default:
+            break;
+    }
+    //printf("Mouse: %d/%d - buttons: %02x - wheel: %d protocol: %d\n", dx, dy, buttons, wheel, protocol_mode);
 }
 
 void MOUSE::mousing_can_send_now(void)
 {
-    send_report(buttons_, dx_, dy_, wheel_);
+    send_report(buttons_, dx_, dy_, wheel_ / 16);
     // reset
     dx_ = 0;
     dy_ = 0;
-    wheel_ = 0;
+    if (wheel_ / 16)
+    {
+        wheel_ = 0;
+    }
 }
 
 void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
@@ -200,49 +217,90 @@ void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
     dy_ += dy;
     buttons_ = buttons;
     wheel_ += wheel;
-    hid_device_request_can_send_now_event(hid_cid);
+    hids_device_request_can_send_now_event(con_handle);
 }
 
-void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size){
+void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size)
+{
     UNUSED(channel);
     UNUSED(packet_size);
-    MOUSE *mouse = get();
-    switch (packet_type){
-        case HCI_EVENT_PACKET:
-            switch (hci_event_packet_get_type(packet)){
-                case HCI_EVENT_USER_CONFIRMATION_REQUEST:
-                    // ssp: inform about user confirmation request
-                    log_info("SSP User Confirmation Request with numeric value '%06" PRIu32 "'\n", hci_event_user_confirmation_request_get_numeric_value(packet));
-                    log_info("SSP User Confirmation Auto accept\n");
-                    break;
+    uint16_t conn_interval;
 
-                case HCI_EVENT_HID_META:
-                    switch (hci_event_hid_meta_get_subevent_code(packet)){
-                        case HID_SUBEVENT_CONNECTION_OPENED:
-                            if (hid_subevent_connection_opened_get_status(packet) != ERROR_CODE_SUCCESS) return;
-                            mouse->hid_cid = hid_subevent_connection_opened_get_hid_cid(packet);
-#ifdef HAVE_BTSTACK_STDIN
-                            printf("HID Connected, control mouse using arrow keys for movement and 'l' and 'r' for buttons...\n");
-#else
-                            printf("HID Connected, simulating mouse movements...\n");
-                            hid_embedded_start_mousing();
-#endif
-                            break;
-                        case HID_SUBEVENT_CONNECTION_CLOSED:
-                            printf("HID Disconnected\n");
-                            mouse->hid_cid = 0;
-                            break;
-                        case HID_SUBEVENT_CAN_SEND_NOW:
-                            mouse->mousing_can_send_now();
-                            break;
-                        default:
-                            break;
-                    }
+    if (packet_type != HCI_EVENT_PACKET) return;
+
+    MOUSE *mouse = get();
+    switch (hci_event_packet_get_type(packet)) {
+        case HCI_EVENT_DISCONNECTION_COMPLETE:
+            mouse->con_handle = HCI_CON_HANDLE_INVALID;
+            printf("Disconnected\n");
+            break;
+        case SM_EVENT_JUST_WORKS_REQUEST:
+            printf("Just Works requested\n");
+            sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
+            break;
+        case SM_EVENT_NUMERIC_COMPARISON_REQUEST:
+            printf("Confirming numeric comparison: %" PRIu32 "\n", sm_event_numeric_comparison_request_get_passkey(packet));
+            sm_numeric_comparison_confirm(sm_event_passkey_display_number_get_handle(packet));
+            break;
+        case SM_EVENT_PASSKEY_DISPLAY_NUMBER:
+            printf("Display Passkey: %" PRIu32 "\n", sm_event_passkey_display_number_get_passkey(packet));
+            break;
+        case L2CAP_EVENT_CONNECTION_PARAMETER_UPDATE_RESPONSE:
+            printf("L2CAP Connection Parameter Update Complete, response: %x\n", l2cap_event_connection_parameter_update_response_get_result(packet));
+            break;
+        case HCI_EVENT_LE_META:
+            switch (hci_event_le_meta_get_subevent_code(packet)) {
+                case HCI_SUBEVENT_LE_CONNECTION_COMPLETE:
+                    // print connection parameters (without using float operations)
+                    conn_interval = hci_subevent_le_connection_complete_get_conn_interval(packet);
+                    printf("LE Connection Complete:\n");
+                    printf("- Connection Interval: %u.%02u ms\n", conn_interval * 125 / 100, 25 * (conn_interval & 3));
+                    printf("- Connection Latency: %u\n", hci_subevent_le_connection_complete_get_conn_latency(packet));
+                    break;
+                case HCI_SUBEVENT_LE_CONNECTION_UPDATE_COMPLETE:
+                    // print connection parameters (without using float operations)
+                    conn_interval = hci_subevent_le_connection_update_complete_get_conn_interval(packet);
+                    printf("LE Connection Update:\n");
+                    printf("- Connection Interval: %u.%02u ms\n", conn_interval * 125 / 100, 25 * (conn_interval & 3));
+                    printf("- Connection Latency: %u\n", hci_subevent_le_connection_update_complete_get_conn_latency(packet));
+                    break;
+                default:
+                    break;
+            }
+            break;  
+        case HCI_EVENT_HIDS_META:
+            switch (hci_event_hids_meta_get_subevent_code(packet)){
+                case HIDS_SUBEVENT_INPUT_REPORT_ENABLE:
+                    mouse->con_handle = hids_subevent_input_report_enable_get_con_handle(packet);
+                    printf("Report Characteristic Subscribed %u\n", hids_subevent_input_report_enable_get_enable(packet));
+
+                    // request connection param update via L2CAP following Apple Bluetooth Design Guidelines
+                    // gap_request_connection_parameter_update(con_handle, 12, 12, 4, 100);    // 15 ms, 4, 1s
+
+                    // directly update connection params via HCI following Apple Bluetooth Design Guidelines
+                    // gap_update_connection_parameters(con_handle, 12, 12, 4, 100);    // 60-75 ms, 4, 1s
+
+                    break;
+                case HIDS_SUBEVENT_BOOT_KEYBOARD_INPUT_REPORT_ENABLE:
+                    mouse->con_handle = hids_subevent_boot_keyboard_input_report_enable_get_con_handle(packet);
+                    printf("Boot Keyboard Characteristic Subscribed %u\n", hids_subevent_boot_keyboard_input_report_enable_get_enable(packet));
+                    break;
+                case HIDS_SUBEVENT_BOOT_MOUSE_INPUT_REPORT_ENABLE:
+                    mouse->con_handle = hids_subevent_boot_mouse_input_report_enable_get_con_handle(packet);
+                    printf("Boot Mouse Characteristic Subscribed %u\n", hids_subevent_boot_mouse_input_report_enable_get_enable(packet));
+                    break;
+                case HIDS_SUBEVENT_PROTOCOL_MODE:
+                    mouse->protocol_mode = hids_subevent_protocol_mode_get_protocol_mode(packet);
+                    printf("Protocol Mode: %s mode\n", hids_subevent_protocol_mode_get_protocol_mode(packet) ? "Report" : "Boot");
+                    break;
+                case HIDS_SUBEVENT_CAN_SEND_NOW:
+                    mouse->mousing_can_send_now();
                     break;
                 default:
                     break;
             }
             break;
+            
         default:
             break;
     }

@@ -7,17 +7,18 @@
 class MOUSE
 {
 private:
-    uint8_t hid_service_buffer[250];
-    const char hid_device_name[18] = "BTstack HID Mouse";
     btstack_packet_callback_registration_t hci_event_callback_registration;
-    static uint8_t hid_descriptor_mouse_boot_mode[50];
-    uint16_t hid_cid;
-    int hid_boot_device;
+    btstack_packet_callback_registration_t l2cap_event_callback_registration;
+    btstack_packet_callback_registration_t sm_event_callback_registration;
+    hci_con_handle_t con_handle;
+    uint8_t protocol_mode;
 
     int8_t          dx_;
     int8_t          dy_;
     uint8_t         buttons_;
     int8_t          wheel_;
+
+    uint8_t         battery_;
 
     static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size);
     void mousing_can_send_now(void);
@@ -30,7 +31,7 @@ private:
 public:
     static MOUSE *get();
     bool init(async_context_t *context);
-    bool is_connectd() const { return hid_cid != 0; }
+    bool is_connectd() const { return con_handle != HCI_CON_HANDLE_INVALID; }
 
     void action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel);
 };

@@ -89,7 +89,6 @@ static void stdin_process(char character)
 
 void web_message(const std::string &msg)
 {
-    printf("Web message: %s\n", msg.c_str());
     MOUSE *mouse = MOUSE::get();
     if (!mouse->is_connectd()) 
     {
