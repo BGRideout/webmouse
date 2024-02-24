@@ -31,7 +31,7 @@ pico_enable_stdio_usb(${PROJECT_NAME} 1)
 
 # Add the standard library to the build
 if (${PICO_BOARD} STREQUAL "pico_w")
-	set(PLAT_LIBS pico_btstack_ble pico_btstack_cyw43 pico_cyw43_arch_lwip_threadsafe_background pico_mbedtls)
+	set(PLAT_LIBS pico_btstack_ble pico_btstack_cyw43 pico_cyw43_arch_lwip_threadsafe_background pico_mbedtls pico_lwip_mdns)
 else()
 	set(PLAT_LIBS hardware_i2c hardware_spi)
 endif()

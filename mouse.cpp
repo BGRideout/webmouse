@@ -66,7 +66,7 @@
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
-MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), dx_(0), dy_(0), buttons_(0), wheel_(0)
+MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), dx_(0), dy_(0), buttons_(0), wheel_(0), battery_(100)
 {
 
 }

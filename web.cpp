@@ -7,6 +7,7 @@
 #include "pico/cyw43_arch.h"
 #include "mbedtls/sha1.h"
 #include "mbedtls/base64.h"
+#include "lwip/apps/mdns.h"
 
 WEB *WEB::singleton_ = nullptr;
 
@@ -64,6 +65,13 @@ bool WEB::init()
     tcp_arg(server_, this);
     tcp_accept(server_, tcp_server_accept);
 
+#if LWIP_MDNS_RESPONDER
+    mdns_resp_init();
+    mdns_resp_add_netif(netif_default, "webmouse");
+    //mdns_resp_add_service(netif_default, "webmouse", "_http", DNSSD_PROTO_TCP, 80, srv_txt, NULL);
+    mdns_resp_announce(netif_default);
+#endif
+    
     return true;
 }
 
@@ -307,10 +315,9 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "  btn.addEventListener('touchend', (e) => {l_ = 0; report();});\n"
         "  btn.addEventListener('touchcancel', (e) => {l_ = 0; report();});\n"
         "  btn = document.getElementById('right');\n"
-        "  //btn.addEventListener('touchstart', (e) => {r_ = 1; report();});\n"
-        "  //btn.addEventListener('touchend', (e) => {r_ = 0; report();});\n"
-        "  //btn.addEventListener('touchcancel', (e) => {r_ = 0; report();});\n"
-        "  btn.addEventListener('click', (e) => {r_ = 1; report(); r_ = 0; report();});\n"
+        "  btn.addEventListener('touchstart', (e) => {r_ = 1; report();});\n"
+        "  btn.addEventListener('touchend', (e) => {r_ = 0; report();});\n"
+        "  btn.addEventListener('touchcancel', (e) => {r_ = 0; report();});\n"
         "  openWS();\n"
         "  setInterval(checkReport, 100);"
         "});\n"
