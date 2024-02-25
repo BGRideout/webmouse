@@ -63,6 +63,7 @@
 #include "ble/gatt-service/hids_device.h"
 
 #include "mouse_att.h"
+#include "hci_dump_embedded_stdout.h"
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
@@ -104,6 +105,7 @@ bool MOUSE::init(async_context_t *context)
     // from USB HID Specification 1.1, Appendix B.2
     static uint8_t hid_descriptor_mouse[] =
     {
+        //  Mouse
         0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
         0x09, 0x02,                    // USAGE (Mouse)
         0xa1, 0x01,                    // COLLECTION (Application)
@@ -135,10 +137,68 @@ bool MOUSE::init(async_context_t *context)
         0x81, 0x06,                    //     INPUT (Data,Var,Rel)
 
         0xc0,                          //   END_COLLECTION
-        0xc0                           // END_COLLECTION
-    };
-    hids_device_init(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse));
+        0xc0,                          // END_COLLECTION
 
+        //  Keyboard
+    0x05, 0x01,                    // Usage Page (Generic Desktop)
+    0x09, 0x06,                    // Usage (Keyboard)
+    0xa1, 0x01,                    // Collection (Application)
+
+    0x85,  0x04,                   // Report ID 4
+
+    // Modifier byte
+
+    0x75, 0x01,                    //   Report Size (1)
+    0x95, 0x08,                    //   Report Count (8)
+    0x05, 0x07,                    //   Usage Page (Key codes)
+    0x19, 0xe0,                    //   Usage Minimum (Keyboard LeftControl)
+    0x29, 0xe7,                    //   Usage Maxium (Keyboard Right GUI)
+    0x15, 0x00,                    //   Logical Minimum (0)
+    0x25, 0x01,                    //   Logical Maximum (1)
+    0x81, 0x02,                    //   Input (Data, Variable, Absolute)
+
+    // Reserved byte
+
+    0x75, 0x01,                    //   Report Size (1)
+    0x95, 0x08,                    //   Report Count (8)
+    0x81, 0x03,                    //   Input (Constant, Variable, Absolute)
+
+    // LED report + padding
+
+    0x95, 0x05,                    //   Report Count (5)
+    0x75, 0x01,                    //   Report Size (1)
+    0x05, 0x08,                    //   Usage Page (LEDs)
+    0x19, 0x01,                    //   Usage Minimum (Num Lock)
+    0x29, 0x05,                    //   Usage Maxium (Kana)
+    0x91, 0x02,                    //   Output (Data, Variable, Absolute)
+
+    0x95, 0x01,                    //   Report Count (1)
+    0x75, 0x03,                    //   Report Size (3)
+    0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
+
+    // Keycodes
+
+    0x95, 0x06,                    //   Report Count (6)
+    0x75, 0x08,                    //   Report Size (8)
+    0x15, 0x00,                    //   Logical Minimum (0)
+    0x25, 0xff,                    //   Logical Maximum (1)
+    0x05, 0x07,                    //   Usage Page (Key codes)
+    0x19, 0x00,                    //   Usage Minimum (Reserved (no event indicated))
+    0x29, 0xff,                    //   Usage Maxium (Reserved)
+    0x81, 0x00,                    //   Input (Data, Array)
+
+    0xc0,                          // End collection
+ 
+
+    };
+
+    memset(storage_, 0, sizeof(storage_));
+    hids_device_init_with_storage(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse), NUM_REPORTS, storage_);
+    for(int ii = 0; ii < NUM_REPORTS; ii++)
+    {
+        printf("%d type: %d id: %d size: %d\n", ii, storage_[ii].type, storage_[ii].id, storage_[ii].size);
+    }
+ 
     // setup advertisements
     static uint8_t adv_data[] =
     {
@@ -185,18 +245,20 @@ bool MOUSE::init(async_context_t *context)
 // HID Report sending
 void MOUSE::send_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel){
     uint8_t report[] = { buttons, (uint8_t) dx, (uint8_t) dy, (uint8_t)wheel};
+
+    uint8_t sts = -1;
     switch (protocol_mode)
     {
         case 0:
-            hids_device_send_boot_mouse_input_report(con_handle, report, sizeof(report) - 1);
+            sts = hids_device_send_boot_mouse_input_report(con_handle, report, sizeof(report) - 1);
             break;
         case 1:
-            hids_device_send_input_report(con_handle, report, sizeof(report));
+            sts = hids_device_send_input_report_for_id(con_handle, 1, report, sizeof(report));
             break;
         default:
             break;
     }
-    //printf("Mouse: %d/%d - buttons: %02x - wheel: %d protocol: %d\n", dx, dy, buttons, wheel, protocol_mode);
+    printf("Mouse: %d/%d - buttons: %02x - wheel: %d protocol: %d sts: %d\n", dx, dy, buttons, wheel, protocol_mode, sts);
 }
 
 void MOUSE::mousing_can_send_now(void)
