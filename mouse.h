@@ -24,7 +24,7 @@ private:
     void mousing_can_send_now(void);
     void send_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel);
 
-    hids_device_report_t storage_[12];
+    hids_device_report_t storage_[6];
 #define NUM_REPORTS (sizeof(storage_) / sizeof(storage_[0]))
 
     static MOUSE        *singleton_;            // Singleton mouse instance pointer
@@ -37,6 +37,7 @@ public:
     bool is_connectd() const { return con_handle != HCI_CON_HANDLE_INVALID; }
 
     void action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel);
+    void keystroke(uint8_t ch);
 };
 
 #endif

@@ -89,8 +89,8 @@ bool MOUSE::init(async_context_t *context)
     // setup SM: Display only
     sm_init();
     sm_set_io_capabilities(IO_CAPABILITY_DISPLAY_ONLY);
-    // sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
-    sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
+    sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
+    // sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
 
     // setup ATT server
     att_server_init(profile_data, NULL, NULL);
@@ -280,6 +280,11 @@ void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
     buttons_ = buttons;
     wheel_ += wheel;
     hids_device_request_can_send_now_event(con_handle);
+}
+
+void MOUSE::keystroke(uint8_t ch)
+{
+    printf("key code %2.2x\n", ch);
 }
 
 void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size)

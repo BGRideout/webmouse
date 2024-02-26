@@ -100,6 +100,10 @@ void web_message(const std::string &msg)
     int8_t dy = 0;
     uint8_t buttons = 0;
     int8_t wheel;
+    bool mouseact = false;
+
+    uint8_t ch = 0;
+    bool keyact = false;
 
     std::vector<std::string> tok;
     TXT::split(msg, " ", tok);
@@ -121,6 +125,7 @@ void web_message(const std::string &msg)
         {
             printf("Invalid value %s\n", it->c_str());
         }
+        int rawvalue = value;
 
         if (value > 127)
         {
@@ -134,10 +139,12 @@ void web_message(const std::string &msg)
         if (name == "x")
         {
             dx = value;
+            mouseact = true;
         }
         else if (name == "y")
         {
             dy = value;
+            mouseact = true;
         }
         else if (name == "l")
         {
@@ -145,6 +152,7 @@ void web_message(const std::string &msg)
             {
                 buttons |= 1;
             }
+            mouseact = true;
         }
         else if (name == "r")
         {
@@ -152,14 +160,31 @@ void web_message(const std::string &msg)
             {
                 buttons |= 2;
             }
+            mouseact = true;
         }
         else if (name == "w")
         {
+            mouseact = true;
             wheel = value;
+        }
+        else if (name == "c")
+        {
+            if (rawvalue < 0xff)
+            {
+                ch = rawvalue;
+                keyact = true;
+            }
         }
     }
 
-    mouse->action(dx, dy, buttons, wheel);
+    if (mouseact)
+    {
+        mouse->action(dx, dy, buttons, wheel);
+    }
+    if (keyact)
+    {
+        mouse->keystroke(ch);
+    }
 }
 
 int main(int argc, const char *argv[])
