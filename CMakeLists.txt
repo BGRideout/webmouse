@@ -17,7 +17,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 project(webmouse C CXX ASM)
 
-add_executable(${PROJECT_NAME} webmouse.cpp mouse.cpp web.cpp ws.cpp txt.cpp
+add_executable(${PROJECT_NAME} webmouse.cpp mouse.cpp web.cpp ws.cpp txt.cpp keycode.cpp
 	)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR})

@@ -47,6 +47,7 @@
 // *****************************************************************************
 
 #include "mouse.h"
+#include "keycode.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -65,9 +66,12 @@
 #include "mouse_att.h"
 #include "hci_dump_embedded_stdout.h"
 
+#define MOUSE_REPORT_ID 1
+#define KEYBOARD_REPORT_ID 4
+
 MOUSE *MOUSE::singleton_ = nullptr;
 
-MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), dx_(0), dy_(0), buttons_(0), wheel_(0), battery_(100)
+MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(100)
 {
 
 }
@@ -110,7 +114,7 @@ bool MOUSE::init(async_context_t *context)
         0x09, 0x02,                    // USAGE (Mouse)
         0xa1, 0x01,                    // COLLECTION (Application)
 
-        0x85, 0x01,                    // Report ID 1
+        0x85, MOUSE_REPORT_ID,         // Report ID
         0x09, 0x01,                    //   USAGE (Pointer)
         0xa1, 0x00,                    //   COLLECTION (Physical)
 
@@ -140,56 +144,54 @@ bool MOUSE::init(async_context_t *context)
         0xc0,                          // END_COLLECTION
 
         //  Keyboard
-    0x05, 0x01,                    // Usage Page (Generic Desktop)
-    0x09, 0x06,                    // Usage (Keyboard)
-    0xa1, 0x01,                    // Collection (Application)
+        0x05, 0x01,                    // Usage Page (Generic Desktop)
+        0x09, 0x06,                    // Usage (Keyboard)
+        0xa1, 0x01,                    // Collection (Application)
 
-    0x85,  0x04,                   // Report ID 4
+        0x85,  KEYBOARD_REPORT_ID,     // Report ID
 
-    // Modifier byte
+        // Modifier byte
 
-    0x75, 0x01,                    //   Report Size (1)
-    0x95, 0x08,                    //   Report Count (8)
-    0x05, 0x07,                    //   Usage Page (Key codes)
-    0x19, 0xe0,                    //   Usage Minimum (Keyboard LeftControl)
-    0x29, 0xe7,                    //   Usage Maxium (Keyboard Right GUI)
-    0x15, 0x00,                    //   Logical Minimum (0)
-    0x25, 0x01,                    //   Logical Maximum (1)
-    0x81, 0x02,                    //   Input (Data, Variable, Absolute)
+        0x75, 0x01,                    //   Report Size (1)
+        0x95, 0x08,                    //   Report Count (8)
+        0x05, 0x07,                    //   Usage Page (Key codes)
+        0x19, 0xe0,                    //   Usage Minimum (Keyboard LeftControl)
+        0x29, 0xe7,                    //   Usage Maxium (Keyboard Right GUI)
+        0x15, 0x00,                    //   Logical Minimum (0)
+        0x25, 0x01,                    //   Logical Maximum (1)
+        0x81, 0x02,                    //   Input (Data, Variable, Absolute)
 
-    // Reserved byte
+        // Reserved byte
 
-    0x75, 0x01,                    //   Report Size (1)
-    0x95, 0x08,                    //   Report Count (8)
-    0x81, 0x03,                    //   Input (Constant, Variable, Absolute)
+        0x75, 0x01,                    //   Report Size (1)
+        0x95, 0x08,                    //   Report Count (8)
+        0x81, 0x03,                    //   Input (Constant, Variable, Absolute)
 
-    // LED report + padding
+        // LED report + padding
 
-    0x95, 0x05,                    //   Report Count (5)
-    0x75, 0x01,                    //   Report Size (1)
-    0x05, 0x08,                    //   Usage Page (LEDs)
-    0x19, 0x01,                    //   Usage Minimum (Num Lock)
-    0x29, 0x05,                    //   Usage Maxium (Kana)
-    0x91, 0x02,                    //   Output (Data, Variable, Absolute)
+        0x95, 0x05,                    //   Report Count (5)
+        0x75, 0x01,                    //   Report Size (1)
+        0x05, 0x08,                    //   Usage Page (LEDs)
+        0x19, 0x01,                    //   Usage Minimum (Num Lock)
+        0x29, 0x05,                    //   Usage Maxium (Kana)
+        0x91, 0x02,                    //   Output (Data, Variable, Absolute)
 
-    0x95, 0x01,                    //   Report Count (1)
-    0x75, 0x03,                    //   Report Size (3)
-    0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
+        0x95, 0x01,                    //   Report Count (1)
+        0x75, 0x03,                    //   Report Size (3)
+        0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
 
-    // Keycodes
+        // Keycodes
 
-    0x95, 0x06,                    //   Report Count (6)
-    0x75, 0x08,                    //   Report Size (8)
-    0x15, 0x00,                    //   Logical Minimum (0)
-    0x25, 0xff,                    //   Logical Maximum (1)
-    0x05, 0x07,                    //   Usage Page (Key codes)
-    0x19, 0x00,                    //   Usage Minimum (Reserved (no event indicated))
-    0x29, 0xff,                    //   Usage Maxium (Reserved)
-    0x81, 0x00,                    //   Input (Data, Array)
+        0x95, 0x06,                    //   Report Count (6)
+        0x75, 0x08,                    //   Report Size (8)
+        0x15, 0x00,                    //   Logical Minimum (0)
+        0x25, 0xff,                    //   Logical Maximum (1)
+        0x05, 0x07,                    //   Usage Page (Key codes)
+        0x19, 0x00,                    //   Usage Minimum (Reserved (no event indicated))
+        0x29, 0xff,                    //   Usage Maxium (Reserved)
+        0x81, 0x00,                    //   Input (Data, Array)
 
-    0xc0,                          // End collection
- 
-
+        0xc0,                          // End collection
     };
 
     memset(storage_, 0, sizeof(storage_));
@@ -210,7 +212,9 @@ bool MOUSE::init(async_context_t *context)
         0x03, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, ORG_BLUETOOTH_SERVICE_HUMAN_INTERFACE_DEVICE & 0xff, ORG_BLUETOOTH_SERVICE_HUMAN_INTERFACE_DEVICE >> 8,
         // Appearance HID - Mouse (Category 15, Sub-Category 2)
         0x03, BLUETOOTH_DATA_TYPE_APPEARANCE, 0xC2, 0x03,
-    };
+        // Appearance HID - Keyboard (Category 15, Sub-Category 1)
+        //0x03, BLUETOOTH_DATA_TYPE_APPEARANCE, 0xC1, 0x03,
+};
     uint8_t adv_data_len = sizeof(adv_data);
 
     uint16_t adv_int_min = 0x0030;
@@ -243,48 +247,84 @@ bool MOUSE::init(async_context_t *context)
 
 
 // HID Report sending
-void MOUSE::send_report(uint8_t buttons, int8_t dx, int8_t dy, int8_t wheel){
-    uint8_t report[] = { buttons, (uint8_t) dx, (uint8_t) dy, (uint8_t)wheel};
-
+void MOUSE::send_report(uint16_t report_id, uint8_t *buffer, uint16_t bufsiz)
+{
     uint8_t sts = -1;
     switch (protocol_mode)
     {
         case 0:
-            sts = hids_device_send_boot_mouse_input_report(con_handle, report, sizeof(report) - 1);
+            if (bufsiz == 4)
+            {
+                sts = hids_device_send_boot_mouse_input_report(con_handle, buffer, bufsiz - 1);
+            }
+            else
+            {
+                sts = hids_device_send_boot_keyboard_input_report(con_handle, buffer, bufsiz);
+            }
             break;
         case 1:
-            sts = hids_device_send_input_report_for_id(con_handle, 1, report, sizeof(report));
+            sts = hids_device_send_input_report_for_id(con_handle, 1, buffer, bufsiz);
             break;
         default:
             break;
     }
-    printf("Mouse: %d/%d - buttons: %02x - wheel: %d protocol: %d sts: %d\n", dx, dy, buttons, wheel, protocol_mode, sts);
+    printf("protocol: %d sts: %d report(%d):", protocol_mode, sts, report_id);
+    for (int ii = 0; ii < bufsiz; ii++)
+    {
+        printf(" %2.2x", buffer[ii]);
+    }
+    printf("\n");
 }
 
 void MOUSE::mousing_can_send_now(void)
 {
-    send_report(buttons_, dx_, dy_, wheel_ / 16);
-    // reset
-    dx_ = 0;
-    dy_ = 0;
-    if (wheel_ / 16)
+    if (reports_.size() > 0)
     {
-        wheel_ = 0;
+        uint16_t report_id;
+        uint8_t  buffer[8];
+        uint16_t buflen;
+        if (reports_.front().get_report(report_id, buffer, sizeof(buffer), buflen))
+        {
+            send_report(report_id, buffer, buflen);
+            if (reports_.front().is_finished())
+            {
+                reports_.pop_front();
+            }
+        }
+        else
+        {
+            printf("Invalid report in queue\n");
+            reports_.pop_front();
+        }
+    }
+    if (reports_.size() > 0)
+    {
+        hids_device_request_can_send_now_event(con_handle);
     }
 }
 
 void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
 {
-    dx_ += dx;
-    dy_ += dy;
-    buttons_ = buttons;
-    wheel_ += wheel;
+    if (reports_.size() == 0 || !reports_.back().add_mouse(dx, dy, buttons, wheel))
+    {
+        reports_.emplace_back(REPORT(dx, dy, buttons, wheel));
+    }
     hids_device_request_can_send_now_event(con_handle);
 }
 
 void MOUSE::keystroke(uint8_t ch)
 {
-    printf("key code %2.2x\n", ch);
+    uint8_t keycode;
+    uint8_t modifier;
+    if (KEYCODE::get_code_and_modifier(ch, keycode, modifier))
+    {
+        reports_.emplace_back(REPORT(keycode, modifier));
+        hids_device_request_can_send_now_event(con_handle);
+    }
+    else
+    {
+        printf("Unsupported character %2.2x\n", ch);
+    }
 }
 
 void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size)
@@ -373,7 +413,72 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
     }
 }
 
-/* LISTING_END */
-/* EXAMPLE_END */
+bool MOUSE::REPORT::add_mouse(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
+{
+    bool ret = (type_ == RPT_MOUSE) && (buttons == buttons_) && (dx + dx_ < 127) && (dy + dy_ < 127) && (wheel + wheel_ < 127);
+    if (ret)
+    {
+        dx_ += dx;
+        dy_ += dy;
+        wheel_ += wheel;
+    }
+    return ret;
+}
 
+bool MOUSE::REPORT::is_finished()
+{
+    bool ret = true;
+    if (type_ == RPT_KEYSTROKE)
+    {
+        type_ = RPT_KEYUP;
+        ret = false;
+    }
+    return ret;
+}
 
+bool MOUSE::REPORT::get_report(uint16_t &report_id, uint8_t *buffer, size_t buflen, uint16_t &rptsize)
+{
+    bool ret = false;
+    report_id = 0;
+    rptsize = 0;
+    int ii = 0;
+    if (type_ == RPT_MOUSE)
+    {
+        if (buflen >= 4)
+        {
+            report_id = MOUSE_REPORT_ID;
+            buffer[ii++] = buttons_;
+            buffer[ii++] = (uint8_t)dx_;
+            buffer[ii++] = (uint8_t)dy_;
+            buffer[ii++] = (uint8_t)(wheel_ / 16);
+            rptsize = 4;
+            ret = true;
+        }
+    }
+    else if (type_ == RPT_KEYSTROKE)
+    {
+        if (buflen >= 8)
+        {
+            report_id = KEYBOARD_REPORT_ID;
+            buffer[ii++] = buttons_;
+            buffer[ii++] = 0;
+            buffer[ii++] = keycode_;
+            rptsize = 8;
+            ret = true;
+        }
+    }
+    else if (type_ == RPT_KEYUP)
+    {
+        if (buflen >= 8)
+        {
+            report_id = KEYBOARD_REPORT_ID;
+            rptsize = 8;
+            ret = true;
+        }
+    }
+    for (; ii < buflen; ii++)
+    {
+        buffer[ii] = 0;
+    }
+    return ret;
+}

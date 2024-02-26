@@ -183,6 +183,7 @@ void web_message(const std::string &msg)
     }
     if (keyact)
     {
+        printf("keystroke %2.2x\n", ch);
         mouse->keystroke(ch);
     }
 }
