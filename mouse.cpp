@@ -198,10 +198,6 @@ bool MOUSE::init(async_context_t *context)
     //att_dump_attributes();
     memset(storage_, 0, sizeof(storage_));
     hids_device_init_with_storage(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse), NUM_REPORTS, storage_);
-    for(int ii = 0; ii < NUM_REPORTS; ii++)
-    {
-        printf("%d type: %d id: %d size: %d\n", ii, storage_[ii].type, storage_[ii].id, storage_[ii].size);
-    }
  
     // setup advertisements
     static uint8_t adv_data[] =
@@ -270,12 +266,12 @@ void MOUSE::send_report(uint16_t report_id, uint8_t *buffer, uint16_t bufsiz)
         default:
             break;
     }
-    printf("protocol: %d sts: %d report(%d):", protocol_mode, sts, report_id);
-    for (int ii = 0; ii < bufsiz; ii++)
-    {
-        printf(" %2.2x", buffer[ii]);
-    }
-    printf("\n");
+    // printf("protocol: %d sts: %d report(%d):", protocol_mode, sts, report_id);
+    // for (int ii = 0; ii < bufsiz; ii++)
+    // {
+    //     printf(" %2.2x", buffer[ii]);
+    // }
+    // printf("\n");
 }
 
 void MOUSE::mousing_can_send_now(void)

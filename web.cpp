@@ -276,9 +276,11 @@ void WEB::send_home_page(struct tcp_pcb *client_pcb)
         "  <h1>Web Mouse</h1>"
         "  <div class='mousearea' id='mousearea'>"
         "  </div>"
-        "  <button type='button' class='l' id='left'>L</button>"
-        "  <input type='text' id='kbd' placeholder='kb' autocorrect='off' autocapitalize='off'>"
-        "  <button type='button' class='r' id='right'>R</button>"
+        "  <div>"
+        "   <button type='button' class='l' id='left'>L</button>"
+        "   <input type='text' id='kbd' placeholder='kb' autocorrect='off' autocapitalize='off'>"
+        "   <button type='button' class='r' id='right'>R</button>"
+        "  </div>"
         " </body>"
         "</html>";
     send_buffer(client_pcb, (void *)html, strlen(html), 0);
@@ -290,10 +292,11 @@ void WEB::send_css_file(struct tcp_pcb *client_pcb)
         "HTTP/1.0 200 OK\r\nContent-type: text/css\r\n\r\n"
         "body {text-align: center; font-family: sans-serif; width: 350px; margin: auto; background: lightblue;}\n"
         "h1 {margin: 0px;}\n"
-        "div.mousearea {width: 100%; height: 512px; border: 1px solid black;}\n"
+        "div {width: 100%;}"
+        "div.mousearea {height: 512px; border: 1px solid black; background: radial-gradient(white, lightblue);}\n"
         "button.l {width: 40%; height:64px; align:left}\n"
         "button.r {width: 40%; height:64px; align:right}\n"
-        "input {width: 5%; margin: 12px;}\n";
+        "input {width: 5%; margin: 12px; text-align: center;}\n";
     send_buffer(client_pcb, (void *)css, strlen(css), 0);
 }
 
