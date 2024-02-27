@@ -67,7 +67,7 @@
 #include "hci_dump_embedded_stdout.h"
 
 #define MOUSE_REPORT_ID 1
-#define KEYBOARD_REPORT_ID 4
+#define KEYBOARD_REPORT_ID 2
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
@@ -194,6 +194,8 @@ bool MOUSE::init(async_context_t *context)
         0xc0,                          // End collection
     };
 
+    //hci_dump_init(hci_dump_embedded_stdout_get_instance());
+    //att_dump_attributes();
     memset(storage_, 0, sizeof(storage_));
     hids_device_init_with_storage(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse), NUM_REPORTS, storage_);
     for(int ii = 0; ii < NUM_REPORTS; ii++)
@@ -263,7 +265,7 @@ void MOUSE::send_report(uint16_t report_id, uint8_t *buffer, uint16_t bufsiz)
             }
             break;
         case 1:
-            sts = hids_device_send_input_report_for_id(con_handle, 1, buffer, bufsiz);
+            sts = hids_device_send_input_report_for_id(con_handle, report_id, buffer, bufsiz);
             break;
         default:
             break;
@@ -379,7 +381,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             switch (hci_event_hids_meta_get_subevent_code(packet)){
                 case HIDS_SUBEVENT_INPUT_REPORT_ENABLE:
                     mouse->con_handle = hids_subevent_input_report_enable_get_con_handle(packet);
-                    printf("Report Characteristic Subscribed %u\n", hids_subevent_input_report_enable_get_enable(packet));
+                    printf("Report Characteristic Subscribed %u handle %x\n", hids_subevent_input_report_enable_get_enable(packet), mouse->con_handle);
 
                     // request connection param update via L2CAP following Apple Bluetooth Design Guidelines
                     // gap_request_connection_parameter_update(con_handle, 12, 12, 4, 100);    // 15 ms, 4, 1s

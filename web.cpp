@@ -274,11 +274,11 @@ void WEB::send_home_page(struct tcp_pcb *client_pcb)
         " </head>"
         " <body>"
         "  <h1>Web Mouse</h1>"
-        "  <div class='mousearea' id='mousearea'>x"
+        "  <div class='mousearea' id='mousearea'>"
         "  </div>"
-        "  <button type='button' id='left'>L</button>"
-        "  <input type='text' id='kbd' autocorrect='off' autocapitalize='off'>"
-        "  <button type='button' id='right'>R</button>"
+        "  <button type='button' class='l' id='left'>L</button>"
+        "  <input type='text' id='kbd' placeholder='kb' autocorrect='off' autocapitalize='off'>"
+        "  <button type='button' class='r' id='right'>R</button>"
         " </body>"
         "</html>";
     send_buffer(client_pcb, (void *)html, strlen(html), 0);
@@ -291,8 +291,9 @@ void WEB::send_css_file(struct tcp_pcb *client_pcb)
         "body {text-align: center; font-family: sans-serif; width: 350px; margin: auto; background: lightblue;}\n"
         "h1 {margin: 0px;}\n"
         "div.mousearea {width: 100%; height: 512px; border: 1px solid black;}\n"
-        "button {width: 40%; height:64px;}\n"
-        "input {width: 5%;}\n";
+        "button.l {width: 40%; height:64px; align:left}\n"
+        "button.r {width: 40%; height:64px; align:right}\n"
+        "input {width: 5%; margin: 12px;}\n";
     send_buffer(client_pcb, (void *)css, strlen(css), 0);
 }
 
@@ -355,7 +356,6 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "}\n"
         "function keystroke(e, updown)\n"
         "{\n"
-        "  let ma = document.getElementById('mousearea');\n"
         "  if (updown !== 'input')\n"
         "  {\n"
         "    let cod = e.which;\n"
@@ -363,15 +363,12 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "    {\n"
         "      cod = c_.charCodeAt(0)"
         "    }\n"
-        "    ma.innerHTML = ma.innerHTML + '<br>' + updown + ' code=' + e.which;\n"
-        "    ma.innerHTML = ma.innerHTML + ' value ' + cod.toString(16);\n"
         "    let txt = 'c=' + cod;\n"
         "    sendToWS(txt);\n"
         "  }\n"
         "  else\n"
         "  {\n"
         "    c_ = e.data;\n"
-        "    ma.innerHTML = ma.innerHTML + ' <br>input |' + c_ + '|';\n"
         "    e.srcElement.value = '';\n"
         "  }\n"
         "}\n"
@@ -382,9 +379,8 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "function report()\n"
         "{\n"
         "  let txt = 'x=' + dx_ + ' y=' + dy_ + ' w=' + dw_ + ' l=' + l_ + ' r=' + r_;\n"
-        "  console.log(txt);\n"
-        "  let ma = document.getElementById('mousearea');\n"
-        "  ma.innerHTML = txt;\n"
+        "  //let ma = document.getElementById('mousearea');\n"
+        "  //ma.innerHTML = txt;\n"
         "  dx_ = 0;\n"
         "  dy_ = 0;\n"
         "  dw_ = 0;\n"
