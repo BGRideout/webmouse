@@ -32,3 +32,15 @@ void TXT::trim_front(std::string &str)
     std::size_t ii = str.find_first_not_of(" \t\r\n");
     str.erase(0, ii);
 }
+
+bool TXT::substitute(std::string &target, const std::string &placeholder, const std::string &replacement)
+{
+    bool ret = false;
+    std::size_t ii = target.find(placeholder);
+    if (ii != std::string::npos)
+    {
+        target.replace(ii, placeholder.length(), replacement);
+        ret = true;
+    }
+    return ret;
+}

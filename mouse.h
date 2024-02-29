@@ -5,6 +5,7 @@
 #include <pico/async_context.h>
 
 #include <list>
+#include <string>
 
 class MOUSE
 {
@@ -45,6 +46,9 @@ private:
     hids_device_report_t storage_[6];
 #define NUM_REPORTS (sizeof(storage_) / sizeof(storage_[0]))
 
+    void (*message_callback_)(const std::string &msg);
+    void send_web_message(const std::string &key, const std::string &value);
+
     static MOUSE        *singleton_;            // Singleton mouse instance pointer
 
     MOUSE();
@@ -56,6 +60,8 @@ public:
 
     void action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel);
     void keystroke(uint8_t ch);
+
+    void set_message_callback(void(*cb)(const std::string &msg)) { message_callback_ = cb; }
 };
 
 #endif

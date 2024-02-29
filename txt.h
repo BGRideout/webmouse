@@ -10,7 +10,7 @@ public:
     static void split(const std::string &src, const std::string &separators, std::vector<std::string> &tokens);
     static void trim_back(std::string &str);
     static void trim_front(std::string &str);
-
+    static bool substitute(std::string &target, const std::string &placeholder, const std::string &replacement);
 };
 
 #endif

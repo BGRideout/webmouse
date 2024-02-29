@@ -71,7 +71,7 @@
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
-MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(100)
+MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(100), message_callback_(nullptr)
 {
 
 }
@@ -338,6 +338,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
         case HCI_EVENT_DISCONNECTION_COMPLETE:
             mouse->con_handle = HCI_CON_HANDLE_INVALID;
             printf("Disconnected\n");
+            get()->send_web_message("connect", "false");
             break;
         case SM_EVENT_JUST_WORKS_REQUEST:
             printf("Just Works requested\n");
@@ -349,6 +350,12 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             break;
         case SM_EVENT_PASSKEY_DISPLAY_NUMBER:
             printf("Display Passkey: %" PRIu32 "\n", sm_event_passkey_display_number_get_passkey(packet));
+            if (get()->message_callback_)
+            {
+                char pin[8];
+                snprintf(pin, sizeof(pin), "%6.6d", sm_event_passkey_display_number_get_passkey(packet));
+                get()->send_web_message("pin", pin);
+            }
             break;
         case L2CAP_EVENT_CONNECTION_PARAMETER_UPDATE_RESPONSE:
             printf("L2CAP Connection Parameter Update Complete, response: %x\n", l2cap_event_connection_parameter_update_response_get_result(packet));
@@ -385,6 +392,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
                     // directly update connection params via HCI following Apple Bluetooth Design Guidelines
                     // gap_update_connection_parameters(con_handle, 12, 12, 4, 100);    // 60-75 ms, 4, 1s
 
+                    get()->send_web_message("connect", "true");
                     break;
                 case HIDS_SUBEVENT_BOOT_KEYBOARD_INPUT_REPORT_ENABLE:
                     mouse->con_handle = hids_subevent_boot_keyboard_input_report_enable_get_con_handle(packet);
@@ -408,6 +416,15 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             
         default:
             break;
+    }
+}
+
+void MOUSE::send_web_message(const std::string &key, const std::string &value)
+{
+    if (message_callback_)
+    {
+        std::string msg = std::string("{\"") + key + std::string("\":\"") + value + std::string("\"}");
+        message_callback_(msg);
     }
 }
 

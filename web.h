@@ -31,6 +31,7 @@ private:
 
         uint32_t to_send() const { return size_ - sent_; }
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
+        void requeue(void *buffer, u16_t buflen);
     };
 
     class CLIENT
@@ -64,21 +65,29 @@ private:
         void queue_send(void *buffer, u16_t buflen, bool allocate);
         bool get_next(u16_t count, void **buffer, u16_t *buflen);
         bool more_to_send() const { return sendbuf_.size() > 0; }
+        void requeue(void *buffer, u16_t buflen);
     };
     std::map<struct tcp_pcb *, CLIENT> clients_;    // Connected clients
 
     static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err);
     static err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
     static err_t tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
+    static err_t tcp_server_poll(void *arg, struct tcp_pcb *tpcb);
+    static void  tcp_server_err(void *arg, err_t err);
 
     void process_rqst(struct tcp_pcb *client_pcb);
     void send_home_page(struct tcp_pcb *client_pcb);
     void send_css_file(struct tcp_pcb *client_pcb);
-    void send_js_file(struct tcp_pcb *client_pcb);
+    void send_webmouse_js_file(struct tcp_pcb *client_pcb);
+    void send_websocket_js_file(struct tcp_pcb *client_pcb);
+    void send_config_file(struct tcp_pcb *client_pcb);
+    void send_config_js_file(struct tcp_pcb *client_pcb);
 
     void open_websocket(struct tcp_pcb *client_pcb, std::vector<std::string> &headers);
     void process_websocket(struct tcp_pcb *client_pcb);
-    void send_websocket(struct tcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask = true);
+    void send_websocket(struct tcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask = false);
+
+    void get_wifi(struct tcp_pcb *client_pcb);
 
     void close_client(struct tcp_pcb *client_pcb, bool isClosed = false);
     
@@ -95,6 +104,7 @@ public:
     bool init();
 
     void set_message_callback(void(*cb)(const std::string &msg)) { message_callback_ = cb; }
+    void broadcast_websocket(const std::string &txt);
 };
 
 #endif

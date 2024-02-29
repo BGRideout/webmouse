@@ -1,6 +1,7 @@
 #include "web.h"
 #include "ws.h"
 #include "txt.h"
+#include "config.h"
 
 #include "stdio.h"
 
@@ -24,15 +25,13 @@ WEB *WEB::get()
     return singleton_;
 }
 
-#define WIFI_SSID "VodafoneMobileWiFi-B56878"
-#define WIFI_PASSWORD "9647950309"
-
 bool WEB::init()
 {
     cyw43_arch_enable_sta_mode();
 
-    printf("Connecting to Wi-Fi...\n");
-    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000))
+    CONFIG *cfg = CONFIG::get();
+    printf("Connecting to Wi-Fi on SSID '%s' ...\n", cfg->ssid());
+    if (cyw43_arch_wifi_connect_timeout_ms(cfg->ssid(), cfg->password(), CYW43_AUTH_WPA2_AES_PSK, 30000))
     {
         printf("failed to connect.\n");
         return 1;
@@ -67,7 +66,7 @@ bool WEB::init()
 
 #if LWIP_MDNS_RESPONDER
     mdns_resp_init();
-    mdns_resp_add_netif(netif_default, "webmouse");
+    mdns_resp_add_netif(netif_default, cfg->hostname());
     //mdns_resp_add_service(netif_default, "webmouse", "_http", DNSSD_PROTO_TCP, 80, srv_txt, NULL);
     mdns_resp_announce(netif_default);
 #endif
@@ -77,26 +76,26 @@ bool WEB::init()
 
 err_t WEB::tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
 {
-    WEB *web = (WEB *)arg;
+    WEB *web = get();
     if (err != ERR_OK || client_pcb == NULL) {
-        printf("Failure in accept\n");
+        printf("Failure in accept %d\n", err);
         return ERR_VAL;
     }
     web->clients_[client_pcb] = WEB::CLIENT();
     printf("Client connected %p (%d clients)\n", client_pcb, web->clients_.size());
 
-    tcp_arg(client_pcb, web);
+    tcp_arg(client_pcb, client_pcb);
     tcp_sent(client_pcb, tcp_server_sent);
     tcp_recv(client_pcb, tcp_server_recv);
-    //tcp_poll(client_pcb, tcp_server_poll, POLL_TIME_S * 2);
-    //tcp_err(client_pcb, tcp_server_err);
+    tcp_poll(client_pcb, tcp_server_poll, 1 * 2);
+    tcp_err(client_pcb, tcp_server_err);
 
     return ERR_OK;
 }
 
 err_t WEB::tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
-    WEB *web = (WEB *)arg;
+    WEB *web = get();
     if (!p)
     {
         web->close_client(tpcb);
@@ -145,9 +144,35 @@ err_t WEB::tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
 
 err_t WEB::tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 {
-    WEB *web = (WEB *)arg;
+    WEB *web = get();
     web->write_next(tpcb);
     return ERR_OK;
+}
+
+err_t WEB::tcp_server_poll(void *arg, struct tcp_pcb *tpcb)
+{
+    WEB *web = get();
+    for (auto ci = web->clients_.begin(); ci != web->clients_.end(); ++ci)
+    {
+        if (ci->second.more_to_send())
+        {
+            printf("Sending to %p on poll\n", ci->first);
+            web->write_next(ci->first);
+        }
+    }
+    return ERR_OK;
+}
+
+void WEB::tcp_server_err(void *arg, err_t err)
+{
+    WEB *web = get();
+    tcp_pcb *client_pcb = (tcp_pcb *)arg;
+    printf("Error %d on client %p\n", err, client_pcb);
+    auto ci = web->clients_.find(client_pcb);
+    if (ci != web->clients_.end())
+    {
+        web->close_client(client_pcb, true);
+    }
 }
 
 err_t WEB::send_buffer(struct tcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate)
@@ -183,7 +208,8 @@ err_t WEB::write_next(tcp_pcb *client_pcb)
             cyw43_arch_lwip_end();
             if (err != ERR_OK)
             {
-                printf("Failed to write data %d\n", err);
+                printf("Failed to write %d bytes of data %d to %p\n", buflen, err, client_pcb);
+                ci->second.requeue(buffer, buflen);
             }
         }
 
@@ -225,13 +251,25 @@ void WEB::process_rqst(struct tcp_pcb *client_pcb)
                 {
                     send_home_page(client_pcb);
                 }
+                else if (url == "/config")
+                {
+                    send_config_file(client_pcb);
+                }
                 else if (url == "/webmouse.css")
                 {
                     send_css_file(client_pcb);
                 }
                 else if (url == "/webmouse.js")
                 {
-                    send_js_file(client_pcb);
+                    send_webmouse_js_file(client_pcb);
+                }
+                else if (url == "/websocket.js")
+                {
+                    send_websocket_js_file(client_pcb);
+                }
+                else if (url == "/config.js")
+                {
+                    send_config_js_file(client_pcb);
                 }
                 else if (url == "/ws/")
                 {
@@ -270,6 +308,7 @@ void WEB::send_home_page(struct tcp_pcb *client_pcb)
         "  <title>Web Mouse</title>"
         "  <meta name='viewport' content='width=device-width, initial-scale=1'>"
         "  <link rel='stylesheet' type='text/css' href='/webmouse.css' />"
+        "  <script type='text/javascript' src='/websocket.js'></script>"
         "  <script type='text/javascript' src='/webmouse.js'></script>"
         " </head>"
         " <body>"
@@ -278,7 +317,7 @@ void WEB::send_home_page(struct tcp_pcb *client_pcb)
         "  </div>"
         "  <div>"
         "   <button type='button' class='l' id='left'>L</button>"
-        "   <input type='text' id='kbd' placeholder='kb' autocorrect='off' autocapitalize='off'>"
+        "   <input type='text' id='kbd' class='kbd' placeholder='kb' autocorrect='off' autocapitalize='off'>"
         "   <button type='button' class='r' id='right'>R</button>"
         "  </div>"
         " </body>"
@@ -294,13 +333,18 @@ void WEB::send_css_file(struct tcp_pcb *client_pcb)
         "h1 {margin: 0px;}\n"
         "div {width: 100%;}"
         "div.mousearea {height: 512px; border: 1px solid black; background: radial-gradient(white, lightblue);}\n"
+        "div.vspace {height: 24px;}\n"
         "button.l {width: 40%; height:64px; align:left}\n"
         "button.r {width: 40%; height:64px; align:right}\n"
-        "input {width: 5%; margin: 12px; text-align: center;}\n";
+        "input.kbd {width: 5%; margin: 12px; text-align: center;}\n"
+        ".config {display: grid; grid-template-columns: 3fr 3fr 1fr; row-gap: 8px;}\n"
+        ".config label {width: 100px; display: inline-block; text-align: left;}\n"
+        ".config input {width: 192px;}\n"
+        ".config select {width: 200px;}\n";
     send_buffer(client_pcb, (void *)css, strlen(css), 0);
 }
 
-void WEB::send_js_file(struct tcp_pcb *client_pcb)
+void WEB::send_webmouse_js_file(struct tcp_pcb *client_pcb)
 {
     static char js[] =
         "HTTP/1.0 200 OK\r\nContent-type: text/javascript\r\n\r\n"
@@ -366,7 +410,7 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "    {\n"
         "      cod = c_.charCodeAt(0)"
         "    }\n"
-        "    let txt = 'c=' + cod;\n"
+        "    let txt = 'func=keyboard c=' + cod;\n"
         "    sendToWS(txt);\n"
         "  }\n"
         "  else\n"
@@ -381,7 +425,7 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "}\n"
         "function report()\n"
         "{\n"
-        "  let txt = 'x=' + dx_ + ' y=' + dy_ + ' w=' + dw_ + ' l=' + l_ + ' r=' + r_;\n"
+        "  let txt = 'func=mouse x=' + dx_ + ' y=' + dy_ + ' w=' + dw_ + ' l=' + l_ + ' r=' + r_;\n"
         "  //let ma = document.getElementById('mousearea');\n"
         "  //ma.innerHTML = txt;\n"
         "  dx_ = 0;\n"
@@ -389,7 +433,16 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "  dw_ = 0;\n"
         "  sendToWS(txt);\n"
         "}\n"
-        ""
+        "function process_ws_message(evt)"
+        "{\n"
+        "}\n";
+     send_buffer(client_pcb, (void *)js, strlen(js), 0);
+}
+
+void WEB::send_websocket_js_file(struct tcp_pcb *client_pcb)
+{
+    static char js[] =
+        "HTTP/1.0 200 OK\r\nContent-type: text/javascript\r\n\r\n"
         "// Websocket variables\n"
         "var ws = undefined;             // WebSocket object\n"
         "var timer_ = undefined;         // Reconnect timer\n"
@@ -407,7 +460,7 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "            ws.close();\n"
         "            ws = undefined;\n"
         "        }\n"
-        "        opened_ = false;\n"
+        "        setWSOpened(false);\n"
         "        console.log('ws://' + location.host + '/ws/');\n"
         "        ws = new WebSocket('ws://' + location.host + '/ws/');\n"
         "        if (conchk_ === undefined)\n"
@@ -424,7 +477,7 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "        ws.onclose = function()\n"
         "        {\n"
         "            console.log('ws closed');\n"
-        "            opened_ = false;\n"
+        "            setWSOpened(false);\n"
         "            ws = undefined;\n"
         "            if (conchk_ !== undefined)\n"
         "            {\n"
@@ -445,7 +498,7 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "            if (ws !== undefined)\n"
         "            {\n"
         "                ws.close();\n"
-        "                opened_ = false;\n"
+        "                setWSOpened(false);\n"
         "                retryConnection();\n"
         "            }\n"
         "        };\n"
@@ -469,7 +522,7 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "                        {\n"
         "                            ws.close();\n"
         "                        }\n"
-        "                        opened_ = false;\n"
+        "                        setWSOpened(false);\n"
         "                    }\n"
         "                };\n"
         "            }\n"
@@ -488,11 +541,23 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "        {\n"
         "            if (!opened_)\n"
         "            {\n"
-        "                opened_ = true;\n"
+        "                setWSOpened(true);\n"
         "                console.log('ws connected after ' + (retries * 250) + ' msec');\n"
         "            }\n"
         "        }\n"
         "    }\n"
+        "}\n"
+        "\n"
+        "function setWSOpened(state)\n"
+        "{\n"
+        "  if (state != opened_)\n"
+        "  {\n"
+        "    opened_ = state;\n"
+        "    let obj = new Object;\n"
+        "    obj['open'] = opened_;\n"
+        "    const evt = new CustomEvent('ws_state', { detail: { obj: obj } });\n"
+        "    document.dispatchEvent(evt);\n"
+        "  }\n"
         "}\n"
         "\n"
         "function retryConnection()\n"
@@ -517,6 +582,96 @@ void WEB::send_js_file(struct tcp_pcb *client_pcb)
         "    {\n"
         "        alert('No connection to remote!\\nRefresh browser and try again.');\n"
         "    }\n"
+        "}\n";
+    send_buffer(client_pcb, (void *)js, strlen(js), 0);
+}
+
+void WEB::send_config_file(struct tcp_pcb *client_pcb)
+{
+    static char html[] =
+        "HTTP/1.0 200 OK\r\nContent-type: text/html\r\n\r\n<!DOCTYPE html>\n"
+        "<html>\n"
+        " <head>\n"
+        "  <title>Webmouse Setup</title>\n"
+        "  <meta name='viewport' content='width=device-width, initial-scale=1'>\n"
+        "  <link rel='stylesheet' type='text/css' href='/webmouse.css' />\n"
+        "  <script type='text/javascript' src='/websocket.js'></script>\n"
+        "  <script type='text/javascript' src='/config.js'></script>\n"
+        " </head>\n"
+        " <body>\n"
+        "  <h1>WiFi Setup</h1>\n"
+        "  <div class='config'>\n"
+        "   <label for='hostname'>Host name</label><input type='text' id='hostname' name='hostname' value=''>\n"
+        "    <span></span>\n"
+        "   <label for='ssid'>WiFi name</label><input type='text' id='ssid' name='ssid' value=''><span></span>\n"
+        "   <span></span><select id='ssids'><option value=''>-- Choose WiFi access point --</option></select>\n"
+        "    <button type='button' name='button' id='scan' value='scan'>Scan</button>\n"
+        "   <label for='pwd'>Password</label><input type='password' id='pwd' name='pwd' value=''>\n"
+        "    <span></span>\n"
+        "   <label for='ip'>IP address</label><span id='ip' class='ip'></span><span></span>\n"
+        "   <button type='button' name='button' id='update' value='update'>Update</button><span></span>\n"
+        "  </div>\n"
+        "  <div class='vspace'></div>\n"
+        "  <h1>Bluetooth Setup</h1>\n"
+        "  <div class='config'>\n"
+        "    <label>PIN</label><span id='pin' class='pin'></span><span></span>\n"
+        "  </div>\n"
+        " </body>\n"
+        "</html>\n";
+    send_buffer(client_pcb, (void *)html, strlen(html), 0);
+}
+
+void WEB::send_config_js_file(struct tcp_pcb *client_pcb)
+{
+    static char js[] =
+        "HTTP/1.0 200 OK\r\nContent-type: text/javascript\r\n\r\n"
+        "document.addEventListener('DOMContentLoaded', function()\n"
+        "{\n"
+        "  document.addEventListener('ws_state', ws_state_change);\n"
+        "  document.getElementById('scan').addEventListener('click', (e) => {sendToWS('func=scan_wifi');});\n"
+        "  document.getElementById('update').addEventListener('click', config_update);\n"
+        "  openWS();\n"
+        "});\n"
+        "function ws_state_change(evt)\n"
+        "{\n"
+        "  if (evt.detail.obj['open'])\n"
+        "  {\n"
+        "    sendToWS('func=get_wifi');\n"
+        "  }\n"
+        "}\n"
+        "function process_ws_message(evt)"
+        "{\n"
+        "  let pin = '';\n"
+        "  try\n"
+        "  {\n"
+        "    let msg = JSON.parse(evt.data);\n"
+        "    console.log(msg);\n"
+        "    if (Object.hasOwn(msg, 'host'))\n"
+        "    {\n"
+        "      document.getElementById('hostname').value = msg['host'];\n"
+        "      document.getElementById('ssid').value = msg['ssid'];\n"
+        "      document.getElementById('ip').innerHTML = msg['ip'];\n"
+        "    }\n"
+        "    if (Object.hasOwn(msg, 'pin'))\n"
+        "    {\n"
+        "      pin = msg['pin'];\n"
+        "    }\n"
+        "  }\n"
+        "  catch(e)\n"
+        "  {\n"
+        "    console.log(e);\n"
+        "  }\n"
+        "  document.getElementById('pin').innerHTML = pin;\n"
+        "}\n"
+        "function config_update()\n"
+        "{\n"
+        "  let cmd = 'func=config_update';\n"
+        "  let inps = document.querySelectorAll('input');\n"
+        "  for (inp of inps)\n"
+        "  {\n"
+        "    cmd += ' ' + inp.name + '=' + inp.value;"
+        "  }\n"
+        "  sendToWS(cmd);"
         "}\n";
     send_buffer(client_pcb, (void *)js, strlen(js), 0);
 }
@@ -605,6 +760,7 @@ void WEB::open_websocket(struct tcp_pcb *client_pcb, std::vector<std::string> &h
 
 void WEB::process_websocket(struct tcp_pcb *client_pcb)
 {
+    std::string func;
     auto ci = clients_.find(client_pcb);
     if (ci != clients_.end())
     {
@@ -613,7 +769,32 @@ void WEB::process_websocket(struct tcp_pcb *client_pcb)
         switch (opc)
         {
         case WEBSOCKET_OPCODE_TEXT:
-            if (message_callback_)
+            if (payload.substr(0, 5) == "func=")
+            {
+                std::size_t ii = payload.find_first_of(" ");
+                if (ii == std::string::npos)
+                {
+                    func = func = payload.substr(5);
+                }
+                else
+                {
+                    func = payload.substr(5, ii - 5);
+                }
+            }
+
+            if (func == "get_wifi")
+            {
+                get_wifi(client_pcb);
+            }
+            else if (func == "scan_wifi")
+            {
+                printf("Scan WiFi\n");
+            }
+            else if (func == "config_update")
+            {
+                printf("%s\n", payload.c_str());
+            }
+            else if (message_callback_)
             {
                 message_callback_(payload);
             }
@@ -641,14 +822,35 @@ void WEB::send_websocket(struct tcp_pcb *client_pcb, enum WebSocketOpCode opc, c
     send_buffer(client_pcb, (void *)msg.c_str(), msg.length());
 }
 
+void WEB::broadcast_websocket(const std::string &txt)
+{
+    for (auto it = clients_.begin(); it != clients_.end(); ++it)
+    {
+        if (it->second.isWebSocket())
+        {
+            send_websocket(it->first, WEBSOCKET_OPCODE_TEXT, txt);
+        }
+    }
+}
+
+void WEB::get_wifi(struct tcp_pcb *client_pcb)
+{
+    CONFIG *cfg = CONFIG::get();
+    std::string wifi("{\"host\":\"<h>\", \"ssid\":\"<s>\", \"ip\":\"<a>\"}");
+    TXT::substitute(wifi, "<h>", cfg->hostname());
+    TXT::substitute(wifi, "<s>", cfg->ssid());
+    TXT::substitute(wifi, "<a>", ip4addr_ntoa(netif_ip4_addr(netif_list)));
+    send_websocket(client_pcb, WEBSOCKET_OPCODE_TEXT, wifi);
+}
+
 void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
 {
     auto ci = clients_.find(client_pcb);
     if (ci != clients_.end())
     {
-        printf("Closing %s %p.%s\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb, (ci->second.more_to_send() ? " waiting" : ""));
         if (!isClosed)
         {
+            printf("Closing %s %p.%s\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb, (ci->second.more_to_send() ? " waiting" : ""));
             ci->second.setClosed();
             if (!ci->second.more_to_send())
             {
@@ -658,6 +860,7 @@ void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
         }
         else
         {
+            printf("Closing %s %p for error\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb);
             clients_.erase(ci);
         }
     }
@@ -735,6 +938,14 @@ bool WEB::CLIENT::get_next(u16_t count, void **buffer, u16_t *buflen)
     return ret;
 }
 
+void WEB::CLIENT::requeue(void *buffer, u16_t buflen)
+{
+    if (sendbuf_.size() > 0)
+    {
+        sendbuf_.front()->requeue(buffer, buflen);
+    }
+}
+
 void WEB::CLIENT::resetRqst()
 {
     if (!isWebSocket())
@@ -798,4 +1009,25 @@ bool WEB::SENDBUF::get_next(u16_t count, void **buffer, u16_t *buflen)
     sent_ += nn;
 
     return ret;
+}
+
+void WEB::SENDBUF::requeue(void *buffer, u16_t buflen)
+{
+    int32_t nn = sent_ - buflen;
+    if (nn >= 0)
+    {
+        if (memcmp(&buffer_[nn], buffer, buflen) == 0)
+        {
+            sent_ = nn;
+            printf("%d bytes requeued\n", buflen);
+        }
+        else
+        {
+            printf("Buffer mismatch! %d bytes not requeued\n", buflen);
+        }
+    }
+    else
+    {
+        printf("%d bytes to requeue exceeds %d sent\n", buflen, sent_);
+    }
 }

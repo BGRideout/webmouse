@@ -13,6 +13,7 @@
 #include "mouse.h"
 #include "web.h"
 #include "txt.h"
+#include "config.h"
 
 #include <stdexcept>
 
@@ -75,6 +76,9 @@ static void stdin_process(char character)
         case 'r':
             buttons |= 2;
             break;
+        case 'w':
+            WEB::get()->broadcast_websocket("{\"pin\":\"000000\"}");
+            break;
         default:
             return;
     }
@@ -87,6 +91,12 @@ static void stdin_process(char character)
 
 #endif
 
+
+void mouse_message(const std::string &msg)
+{
+    WEB::get()->broadcast_websocket(msg);
+}
+
 void web_message(const std::string &msg)
 {
     MOUSE *mouse = MOUSE::get();
@@ -96,14 +106,14 @@ void web_message(const std::string &msg)
         return;
     }
 
+    std::string func;
+
     int8_t dx = 0;
     int8_t dy = 0;
     uint8_t buttons = 0;
     int8_t wheel;
-    bool mouseact = false;
 
     uint8_t ch = 0;
-    bool keyact = false;
 
     std::vector<std::string> tok;
     TXT::split(msg, " ", tok);
@@ -112,76 +122,77 @@ void web_message(const std::string &msg)
         std::vector<std::string> val;
         TXT::split(*it, "=", val);
         std::string name = val.at(0);
-        int value = 0;
-        try
+        if (name == "func")
         {
-            value = std::stoi(val.at(1));
+            func = val.at(1);
         }
-        catch (std::invalid_argument)
+        else if (func == "mouse" || func == "keyboard")
         {
-            printf("Invalid value %s\n", it->c_str());
-        }
-        catch (std::out_of_range)
-        {
-            printf("Invalid value %s\n", it->c_str());
-        }
-        int rawvalue = value;
-
-        if (value > 127)
-        {
-            value = 127;
-        }
-        else if (value < -127)
-        {
-            value = -127;
-        }
-
-        if (name == "x")
-        {
-            dx = value;
-            mouseact = true;
-        }
-        else if (name == "y")
-        {
-            dy = value;
-            mouseact = true;
-        }
-        else if (name == "l")
-        {
-            if (value != 0)
+            int value = 0;
+            try
             {
-                buttons |= 1;
+                value = std::stoi(val.at(1));
             }
-            mouseact = true;
-        }
-        else if (name == "r")
-        {
-            if (value != 0)
+            catch (std::invalid_argument)
             {
-                buttons |= 2;
+                printf("Invalid value %s\n", it->c_str());
             }
-            mouseact = true;
-        }
-        else if (name == "w")
-        {
-            mouseact = true;
-            wheel = value;
-        }
-        else if (name == "c")
-        {
-            if (rawvalue < 0xff)
+            catch (std::out_of_range)
             {
-                ch = rawvalue;
-                keyact = true;
+                printf("Invalid value %s\n", it->c_str());
+            }
+            int rawvalue = value;
+
+            if (value > 127)
+            {
+                value = 127;
+            }
+            else if (value < -127)
+            {
+                value = -127;
+            }
+
+            if (name == "x")
+            {
+                dx = value;
+            }
+            else if (name == "y")
+            {
+                dy = value;
+            }
+            else if (name == "l")
+            {
+                if (value != 0)
+                {
+                    buttons |= 1;
+                }
+            }
+            else if (name == "r")
+            {
+                if (value != 0)
+                {
+                    buttons |= 2;
+                }
+            }
+            else if (name == "w")
+            {
+                wheel = value;
+            }
+            else if (name == "c")
+            {
+                if (rawvalue < 0xff)
+                {
+                    ch = rawvalue;
+                }
             }
         }
     }
 
-    if (mouseact)
+    if (func == "mouse")
     {
         mouse->action(dx, dy, buttons, wheel);
     }
-    if (keyact)
+    if (func == "keyboard")
     {
         mouse->keystroke(ch);
     }
@@ -191,6 +202,8 @@ int main(int argc, const char *argv[])
 {
     stdio_init_all();
     printf("webmouse\n");
+
+    CONFIG::get()->init();
 
     if (cyw43_arch_init()) {
         printf("failed to initialise cyw43_arch\n");
@@ -203,6 +216,7 @@ int main(int argc, const char *argv[])
     printf("mouse\n");
     MOUSE *mouse = MOUSE::get();
     mouse->init(nullptr);
+    mouse->set_message_callback(mouse_message);
  
 #ifdef HAVE_BTSTACK_STDIN
     btstack_stdin_setup(stdin_process);
