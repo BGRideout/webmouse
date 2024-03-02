@@ -3,12 +3,19 @@
 
 #include <list>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
+#include <initializer_list>
 
 #include "lwip/tcp.h"
 #include "lwip/pbuf.h"
-
+extern "C" 
+{
+#include "cyw43.h"
+#include "dhcpserver.h"
+}
+#include "pico/time.h"
 #include "ws.h"
 
 class WEB
@@ -87,9 +94,37 @@ private:
     void process_websocket(struct tcp_pcb *client_pcb);
     void send_websocket(struct tcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask = false);
 
-    void get_wifi(struct tcp_pcb *client_pcb);
-
     void close_client(struct tcp_pcb *client_pcb, bool isClosed = false);
+
+    int  wifi_state_;
+    ip_addr_t wifi_addr_;
+    bool connect_to_wifi();
+    void check_wifi();
+    void get_wifi(struct tcp_pcb *client_pcb);
+    void update_wifi(const std::string &cmd);
+    std::set<struct tcp_pcb *> scans_;
+    std::map<std::string, int> ssids_;
+    void scan_wifi(struct tcp_pcb *client_pcb);
+    static int scan_cb(void *arg, const cyw43_ev_scan_result_t *rslt);
+    void check_scan_finished();
+    repeating_timer_t timer_;
+    static bool timer_callback(repeating_timer_t *rt);
+
+    int  ap_active_;
+    bool ap_requested_;
+    bool mdns_active_;
+    dhcp_server_t dhcp_;
+    void enable_ap_button();
+    static void ap_button_callback(uint gpio, uint32_t event_mask);
+    void start_ap();
+    void stop_ap();
+
+    std::vector<bool>   flash_pattern_;
+    int                 flash_index_;
+    void set_flash(const std::initializer_list<bool> &pattern = {});
+    void flash();
+
+    static struct netif *wifi_netif(int ift) { return &cyw43_state.netif[ift]; }
     
     static WEB          *singleton_;                // Singleton pointer
     WEB();

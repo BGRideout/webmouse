@@ -9,10 +9,16 @@
 #include "mbedtls/sha1.h"
 #include "mbedtls/base64.h"
 #include "lwip/apps/mdns.h"
+#include "lwip/netif.h"
+#include "hardware/gpio.h"
+
+#define AP_ACTIVE_MINUTES 30
+#define AP_BUTTON 15
 
 WEB *WEB::singleton_ = nullptr;
 
-WEB::WEB() : server_(nullptr), message_callback_(nullptr)
+WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN), message_callback_(nullptr),
+             ap_active_(0), ap_requested_(false), mdns_active_(false), flash_index_(0)
 {
 }
 
@@ -29,16 +35,10 @@ bool WEB::init()
 {
     cyw43_arch_enable_sta_mode();
 
-    CONFIG *cfg = CONFIG::get();
-    printf("Connecting to Wi-Fi on SSID '%s' ...\n", cfg->ssid());
-    if (cyw43_arch_wifi_connect_timeout_ms(cfg->ssid(), cfg->password(), CYW43_AUTH_WPA2_AES_PSK, 30000))
+    if (!connect_to_wifi())
     {
         printf("failed to connect.\n");
         return 1;
-    }
-    else
-    {
-        printf("Connected as %s.\n", ip4addr_ntoa(netif_ip4_addr(netif_list)));
     }
 
     struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
@@ -64,14 +64,20 @@ bool WEB::init()
     tcp_arg(server_, this);
     tcp_accept(server_, tcp_server_accept);
 
-#if LWIP_MDNS_RESPONDER
     mdns_resp_init();
-    mdns_resp_add_netif(netif_default, cfg->hostname());
-    //mdns_resp_add_service(netif_default, "webmouse", "_http", DNSSD_PROTO_TCP, 80, srv_txt, NULL);
-    mdns_resp_announce(netif_default);
-#endif
     
+    add_repeating_timer_ms(500, timer_callback, this, &timer_);
+    enable_ap_button();
+
+    set_flash({1});
     return true;
+}
+
+bool WEB::connect_to_wifi()
+{
+    CONFIG *cfg = CONFIG::get();
+    printf("Connecting to Wi-Fi on SSID '%s' ...\n", cfg->ssid());
+    return cyw43_arch_wifi_connect_async(cfg->ssid(), cfg->password(), CYW43_AUTH_WPA2_AES_PSK) == 0;
 }
 
 err_t WEB::tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
@@ -604,7 +610,7 @@ void WEB::send_config_file(struct tcp_pcb *client_pcb)
         "   <label for='hostname'>Host name</label><input type='text' id='hostname' name='hostname' value=''>\n"
         "    <span></span>\n"
         "   <label for='ssid'>WiFi name</label><input type='text' id='ssid' name='ssid' value=''><span></span>\n"
-        "   <span></span><select id='ssids'><option value=''>-- Choose WiFi access point --</option></select>\n"
+        "   <span></span><select id='ssids'><option value=''>-- Scan WiFi access points --</option></select>\n"
         "    <button type='button' name='button' id='scan' value='scan'>Scan</button>\n"
         "   <label for='pwd'>Password</label><input type='password' id='pwd' name='pwd' value=''>\n"
         "    <span></span>\n"
@@ -628,8 +634,9 @@ void WEB::send_config_js_file(struct tcp_pcb *client_pcb)
         "document.addEventListener('DOMContentLoaded', function()\n"
         "{\n"
         "  document.addEventListener('ws_state', ws_state_change);\n"
-        "  document.getElementById('scan').addEventListener('click', (e) => {sendToWS('func=scan_wifi');});\n"
+        "  document.getElementById('scan').addEventListener('click', scan_wifi);\n"
         "  document.getElementById('update').addEventListener('click', config_update);\n"
+        "  document.getElementById('ssids').addEventListener('change', ssid_select);\n"
         "  openWS();\n"
         "});\n"
         "function ws_state_change(evt)\n"
@@ -652,6 +659,10 @@ void WEB::send_config_js_file(struct tcp_pcb *client_pcb)
         "      document.getElementById('ssid').value = msg['ssid'];\n"
         "      document.getElementById('ip').innerHTML = msg['ip'];\n"
         "    }\n"
+        "    if (Object.hasOwn(msg, 'ssids'))\n"
+        "    {\n"
+        "      document.getElementById('ssids').innerHTML = msg['ssids'];\n"
+        "    }\n"
         "    if (Object.hasOwn(msg, 'pin'))\n"
         "    {\n"
         "      pin = msg['pin'];\n"
@@ -663,8 +674,14 @@ void WEB::send_config_js_file(struct tcp_pcb *client_pcb)
         "  }\n"
         "  document.getElementById('pin').innerHTML = pin;\n"
         "}\n"
+        "function scan_wifi()\n"
+        "{\n"
+        "  document.getElementById('ssids').innerHTML = '<option>-- Scanning --</option>';\n"
+        "  sendToWS('func=scan_wifi')\n"
+        "}\n"
         "function config_update()\n"
         "{\n"
+        "  document.getElementById('ip').innerHTML = '';\n"
         "  let cmd = 'func=config_update';\n"
         "  let inps = document.querySelectorAll('input');\n"
         "  for (inp of inps)\n"
@@ -672,6 +689,16 @@ void WEB::send_config_js_file(struct tcp_pcb *client_pcb)
         "    cmd += ' ' + inp.name + '=' + inp.value;"
         "  }\n"
         "  sendToWS(cmd);"
+        "}\n"
+        "function ssid_select()\n"
+        "{\n"
+        "  let sel = document.getElementById('ssids');\n"
+        "  let idx = sel.selectedIndex;\n"
+        "  if (idx > 0)\n"
+        "  {\n"
+        "    let ssid = document.getElementById('ssid');\n"
+        "    ssid.value = sel.options[idx].value;\n"
+        "  }\n"
         "}\n";
     send_buffer(client_pcb, (void *)js, strlen(js), 0);
 }
@@ -789,10 +816,11 @@ void WEB::process_websocket(struct tcp_pcb *client_pcb)
             else if (func == "scan_wifi")
             {
                 printf("Scan WiFi\n");
+                scan_wifi(client_pcb);
             }
             else if (func == "config_update")
             {
-                printf("%s\n", payload.c_str());
+                update_wifi(payload);
             }
             else if (message_callback_)
             {
@@ -833,16 +861,6 @@ void WEB::broadcast_websocket(const std::string &txt)
     }
 }
 
-void WEB::get_wifi(struct tcp_pcb *client_pcb)
-{
-    CONFIG *cfg = CONFIG::get();
-    std::string wifi("{\"host\":\"<h>\", \"ssid\":\"<s>\", \"ip\":\"<a>\"}");
-    TXT::substitute(wifi, "<h>", cfg->hostname());
-    TXT::substitute(wifi, "<s>", cfg->ssid());
-    TXT::substitute(wifi, "<a>", ip4addr_ntoa(netif_ip4_addr(netif_list)));
-    send_websocket(client_pcb, WEBSOCKET_OPCODE_TEXT, wifi);
-}
-
 void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
 {
     auto ci = clients_.find(client_pcb);
@@ -870,6 +888,265 @@ void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
         {
             tcp_close(client_pcb);
         }   
+    }
+}
+
+void WEB::check_wifi()
+{
+    netif *ni = wifi_netif(CYW43_ITF_STA);
+    int sts = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
+    if (sts != wifi_state_ || !ip_addr_eq(&ni->ip_addr, &wifi_addr_))
+    {
+        wifi_state_ = sts;
+        wifi_addr_ = ni->ip_addr;
+
+        switch (wifi_state_)
+        {
+        case CYW43_LINK_JOIN:
+        case CYW43_LINK_NOIP:
+            // Progress - no action needed
+            break;
+
+        case CYW43_LINK_UP:
+            //  Connected
+            if (mdns_active_)
+            {
+                mdns_resp_remove_netif(ni);
+            }
+            mdns_resp_add_netif(ni, CONFIG::get()->hostname());
+            mdns_resp_announce(ni);
+            mdns_active_ = true;
+            get_wifi(nullptr);
+            printf("Connected to WiFi with IP address %s\n", ip4addr_ntoa(netif_ip4_addr(ni)));
+            break;
+
+        case CYW43_LINK_DOWN:
+        case CYW43_LINK_FAIL:
+        case CYW43_LINK_NONET:
+            //  Not connected
+            printf("WiFi disconnected. status = %d\n", (wifi_state_ == CYW43_LINK_DOWN) ? "link down" :
+                                                       (wifi_state_ == CYW43_LINK_FAIL) ? "link failed" :
+                                                       "No network found");
+            break;
+
+        case CYW43_LINK_BADAUTH:
+            //  Need intervention to connect
+            printf("WiFi authentication failed\n");
+            break;
+        }
+    }
+
+    if (ap_active_ > 0)
+    {
+        ap_active_ -= 1;
+        if (ap_active_ == 0)
+        {
+            stop_ap();
+        }
+    }
+    if (ap_requested_)
+    {
+        ap_requested_ = false;
+        start_ap();
+    }
+}
+
+void WEB::get_wifi(struct tcp_pcb *client_pcb)
+{
+    CONFIG *cfg = CONFIG::get();
+    std::string wifi("{\"host\":\"<h>\", \"ssid\":\"<s>\", \"ip\":\"<a>\"}");
+    TXT::substitute(wifi, "<h>", cfg->hostname());
+    TXT::substitute(wifi, "<s>", cfg->ssid());
+    TXT::substitute(wifi, "<a>", ip4addr_ntoa(netif_ip4_addr(wifi_netif(CYW43_ITF_STA))));
+    if (client_pcb)
+    {
+        send_websocket(client_pcb, WEBSOCKET_OPCODE_TEXT, wifi);
+    }
+    else
+    {
+        broadcast_websocket(wifi);
+    }
+    scan_wifi(client_pcb);
+}
+
+void WEB::update_wifi(const std::string &cmd)
+{
+    CONFIG *cfg = CONFIG::get();
+    std::string hostname;
+    std::string ssid;
+    std::string password = cfg->password();
+
+    std::vector<std::string> items;
+    TXT::split(cmd, " ", items);
+    for (auto it = items.cbegin(); it != items.cend(); ++it)
+    {
+        std::vector<std::string> item;
+        TXT::split(*it, "=", item);
+        std::string name = item.at(0);
+        std::string value = "";
+        if (item.size() > 1)
+        {
+            value = item.at(1);
+        }
+        if (name == "hostname")
+        {
+            hostname = value;
+        }
+        else if (name == "ssid")
+        {
+            ssid = value;
+        }
+        else if (name == "pwd" && value.length() > 0)
+        {
+            password = value;
+        }
+    }
+
+    printf("Update: host=%s, ssid=%s, pw=%s\n", hostname.c_str(), ssid.c_str(), password.c_str());
+
+    if (hostname != cfg->hostname())
+    {
+        cfg->set_hostname(hostname.c_str());
+    }
+    if (ssid != cfg->ssid() || password != cfg->password())
+    {
+        cfg->set_wifi_credentials(ssid.c_str(), password.c_str());
+    }
+
+    //  Restart the STA WiFi
+    cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
+    connect_to_wifi();
+}
+
+void WEB::scan_wifi(struct tcp_pcb *client_pcb)
+{
+    if (!cyw43_wifi_scan_active(&cyw43_state))
+    {
+        cyw43_wifi_scan_options_t opts = {0};
+        int sts = cyw43_wifi_scan(&cyw43_state, &opts, this, scan_cb);
+        scans_.clear();
+    }
+    scans_.insert(client_pcb);
+}
+
+int WEB::scan_cb(void *arg, const cyw43_ev_scan_result_t *rslt)
+{
+    if (rslt)
+    {
+        std::string ssid;
+        ssid.append((char *)rslt->ssid, rslt->ssid_len);
+        get()->ssids_[ssid] = rslt->rssi;
+    }
+    return 0;
+}
+
+void WEB::check_scan_finished()
+{
+    if (scans_.size() > 0 && !cyw43_wifi_scan_active(&cyw43_state))
+    {
+        std::string msg("{\"ssids\":\"<option value=''>-- Choose WiFi access point --</option>");
+        printf("Scan finished (%d):\n", ssids_.size());
+        for (auto it = ssids_.cbegin(); it != ssids_.cend(); ++it)
+        {
+            printf("  %s\n", it->first.c_str());
+            msg += "<option value='";
+            msg += it->first.c_str();
+            msg += "'>";
+            msg += it->first.c_str();
+            msg += "</option>";
+        }
+        msg += "\"}";
+
+        for (auto it = scans_.cbegin(); it != scans_.cend(); ++it)
+        {
+            if (*it == nullptr)
+            {
+                broadcast_websocket(msg);
+            }
+            else if (clients_.find(*it) != clients_.end())
+            {
+                send_websocket(*it, WEBSOCKET_OPCODE_TEXT, msg);
+            }
+        }
+
+        ssids_.clear();
+        scans_.clear();
+    }
+}
+
+bool WEB::timer_callback(repeating_timer_t *rt)
+{
+    get()->check_wifi();
+    get()->check_scan_finished();
+    get()->flash();
+    return true;
+}
+
+void WEB::enable_ap_button()
+{
+    gpio_init(AP_BUTTON);
+    gpio_set_dir(AP_BUTTON, false);
+    gpio_pull_up(AP_BUTTON);
+    gpio_set_irq_enabled_with_callback(AP_BUTTON, GPIO_IRQ_EDGE_RISE, true, &ap_button_callback);
+}
+
+void WEB::ap_button_callback(uint gpio, uint32_t event_mask)
+{
+    get()->ap_requested_ = true;
+}
+
+void WEB::start_ap()
+{
+    if (ap_active_ == 0)
+    {
+        printf("Starting AP webmouse\n");
+        cyw43_arch_enable_ap_mode("webmouse", "1234567890", CYW43_AUTH_WPA2_AES_PSK);
+        ip4_addr_t addr;
+        ip4_addr_t mask;
+        IP4_ADDR(ip_2_ip4(&addr), 192, 168, 4, 1);
+        IP4_ADDR(ip_2_ip4(&mask), 255, 255, 255, 0);
+    
+        // Start the dhcp server
+        dhcp_server_init(&dhcp_, &addr, &mask);
+        ap_active_ = AP_ACTIVE_MINUTES * 60 * 2;
+
+        set_flash({1,1,1,0});
+    }
+    else
+    {
+        printf("AP is already active\n");
+    }
+}
+
+void WEB::stop_ap()
+{
+    dhcp_server_deinit(&dhcp_);
+    cyw43_arch_disable_ap_mode();
+    printf("AP deactivated\n");
+    set_flash({1});
+}
+
+void WEB::set_flash(const std::initializer_list<bool> &pattern)
+{
+    flash_pattern_ = pattern;
+    flash_index_ = 0;
+}
+
+void WEB::flash()
+{
+    if (flash_index_ >= flash_pattern_.size())
+    {
+        flash_index_ = 0;
+    }
+    if (flash_pattern_.size() > 0)
+    {
+        bool on = flash_pattern_.at(flash_index_);
+        cyw43_arch_gpio_put(0, on);
+        flash_index_ += 1;
+    }
+    else
+    {
+        cyw43_arch_gpio_put(0, false);
     }
 }
 
