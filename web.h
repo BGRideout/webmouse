@@ -6,7 +6,6 @@
 #include <set>
 #include <string>
 #include <vector>
-#include <initializer_list>
 
 #include "lwip/tcp.h"
 #include "lwip/pbuf.h"
@@ -119,11 +118,6 @@ private:
     void start_ap();
     void stop_ap();
 
-    std::vector<bool>   flash_pattern_;
-    int                 flash_index_;
-    void set_flash(const std::initializer_list<bool> &pattern = {});
-    void flash();
-
     static struct netif *wifi_netif(int ift) { return &cyw43_state.netif[ift]; }
     
     static WEB          *singleton_;                // Singleton pointer
@@ -133,6 +127,8 @@ private:
     err_t write_next(struct tcp_pcb *client_pcb);
 
     void (*message_callback_)(const std::string &msg);
+    void (*notice_callback_)(int state);
+    void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
 
 public:
     static WEB *get();
@@ -140,6 +136,13 @@ public:
 
     void set_message_callback(void(*cb)(const std::string &msg)) { message_callback_ = cb; }
     void broadcast_websocket(const std::string &txt);
+
+    static const int STA_INITIALIZING = 101;
+    static const int STA_CONNECTED = 102;
+    static const int STA_DISCONNECTED = 103;
+    static const int AP_ACTIVE = 104;
+    static const int AP_INACTIVE = 105;
+    void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
 };
 
 #endif

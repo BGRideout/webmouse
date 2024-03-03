@@ -14,8 +14,15 @@
 #include "web.h"
 #include "txt.h"
 #include "config.h"
+#include "led.h"
 
 #include <stdexcept>
+
+#define INIT_PATTERN {0, 1}
+#define HEADER_PATTERN {1, 1, 1}
+#define WIFI_AP_PATTERN {1, 1, 0}
+#define WIFI_STA_PATTERN {1, 1, 0, 1, 0}
+#define MOUSE_PATTERN {1, 1, 0, 1, 0, 1, 0}
 
 static btstack_packet_callback_registration_t hci_event_callback_registration;
 static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
@@ -33,6 +40,70 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
             break;
         default:
             break;
+    }
+}
+
+void state_callback(int state)
+{
+    static int wifi_ap = 0;
+    static int wifi_sta = -1;
+    static int ble = -1;
+
+    bool change = false;
+    int newval;
+    switch (state)
+    {
+    case WEB::STA_INITIALIZING:
+    case WEB::STA_DISCONNECTED:
+        newval = 1;
+        change = newval != wifi_sta;
+        if (change) wifi_sta = newval;
+        break;
+    
+    case WEB::STA_CONNECTED:
+        newval = 0;
+        change = newval != wifi_sta;
+        if (change) wifi_sta = newval;
+        break;
+
+    case WEB::AP_ACTIVE:
+        newval = 1;
+        change = newval != wifi_ap;
+        if (change) wifi_ap = newval;
+        break;
+
+    case WEB::AP_INACTIVE:
+        newval = 0;
+        change = newval != wifi_ap;
+        if (change) wifi_ap = newval;
+        break;
+
+    case MOUSE::MOUSE_ACTIVE:
+        newval = 0;
+        change = newval != ble;
+        if (change) ble = newval;
+        break;
+
+    case MOUSE::MOUSE_INACTIVE:
+        newval = 1;
+        change = newval != ble;
+        if (change) ble = newval;
+        break;
+
+    default:
+        break;
+    }
+
+    if (change)
+    {
+        LED *led = LED::get();
+        led->begin_pattern_update();
+        led->add_to_pattern(HEADER_PATTERN);
+        if (wifi_ap) led->add_to_pattern(WIFI_AP_PATTERN);
+        if (wifi_sta) led->add_to_pattern(WIFI_STA_PATTERN);
+        if (ble) led->add_to_pattern(MOUSE_PATTERN);
+        led->end_pattern_update();
+        printf("LED pattern %d %d %d\n", wifi_ap, wifi_sta, ble);
     }
 }
 
@@ -209,12 +280,17 @@ int main(int argc, const char *argv[])
         printf("failed to initialise cyw43_arch\n");
         return -1;
     }
+
+    // Initialize LED
+    LED::get()->set_flash(INIT_PATTERN);
+
     // inform about BTstack state
     hci_event_callback_registration.callback = &packet_handler;
     hci_add_event_handler(&hci_event_callback_registration);
 
     printf("mouse\n");
     MOUSE *mouse = MOUSE::get();
+    mouse->set_notice_callback(state_callback);
     mouse->init(nullptr);
     mouse->set_message_callback(mouse_message);
  
@@ -224,6 +300,7 @@ int main(int argc, const char *argv[])
 
     printf("web\n");
     WEB *web = WEB::get();
+    web->set_notice_callback(state_callback);
     web->init();
     web->set_message_callback(web_message);
 

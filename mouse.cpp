@@ -339,6 +339,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             mouse->con_handle = HCI_CON_HANDLE_INVALID;
             printf("Disconnected\n");
             get()->send_web_message("connect", "false");
+            mouse->send_notice(MOUSE_INACTIVE);
             break;
         case SM_EVENT_JUST_WORKS_REQUEST:
             printf("Just Works requested\n");
@@ -392,7 +393,8 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
                     // directly update connection params via HCI following Apple Bluetooth Design Guidelines
                     // gap_update_connection_parameters(con_handle, 12, 12, 4, 100);    // 60-75 ms, 4, 1s
 
-                    get()->send_web_message("connect", "true");
+                    mouse->send_web_message("connect", "true");
+                    mouse->send_notice(MOUSE_ACTIVE);
                     break;
                 case HIDS_SUBEVENT_BOOT_KEYBOARD_INPUT_REPORT_ENABLE:
                     mouse->con_handle = hids_subevent_boot_keyboard_input_report_enable_get_con_handle(packet);

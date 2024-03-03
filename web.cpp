@@ -17,8 +17,9 @@
 
 WEB *WEB::singleton_ = nullptr;
 
-WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN), message_callback_(nullptr),
-             ap_active_(0), ap_requested_(false), mdns_active_(false), flash_index_(0)
+WEB::WEB() : server_(nullptr), wifi_state_(CYW43_LINK_DOWN),
+             ap_active_(0), ap_requested_(false), mdns_active_(false),
+             message_callback_(nullptr), notice_callback_(nullptr)
 {
 }
 
@@ -69,7 +70,6 @@ bool WEB::init()
     add_repeating_timer_ms(500, timer_callback, this, &timer_);
     enable_ap_button();
 
-    set_flash({1});
     return true;
 }
 
@@ -905,6 +905,7 @@ void WEB::check_wifi()
         case CYW43_LINK_JOIN:
         case CYW43_LINK_NOIP:
             // Progress - no action needed
+            send_notice(STA_INITIALIZING);
             break;
 
         case CYW43_LINK_UP:
@@ -918,20 +919,23 @@ void WEB::check_wifi()
             mdns_active_ = true;
             get_wifi(nullptr);
             printf("Connected to WiFi with IP address %s\n", ip4addr_ntoa(netif_ip4_addr(ni)));
+            send_notice(STA_CONNECTED);
             break;
 
         case CYW43_LINK_DOWN:
         case CYW43_LINK_FAIL:
         case CYW43_LINK_NONET:
             //  Not connected
-            printf("WiFi disconnected. status = %d\n", (wifi_state_ == CYW43_LINK_DOWN) ? "link down" :
+            printf("WiFi disconnected. status = %s\n", (wifi_state_ == CYW43_LINK_DOWN) ? "link down" :
                                                        (wifi_state_ == CYW43_LINK_FAIL) ? "link failed" :
                                                        "No network found");
+            send_notice(STA_DISCONNECTED);
             break;
 
         case CYW43_LINK_BADAUTH:
             //  Need intervention to connect
             printf("WiFi authentication failed\n");
+            send_notice(STA_DISCONNECTED);
             break;
         }
     }
@@ -1078,7 +1082,6 @@ bool WEB::timer_callback(repeating_timer_t *rt)
 {
     get()->check_wifi();
     get()->check_scan_finished();
-    get()->flash();
     return true;
 }
 
@@ -1110,7 +1113,7 @@ void WEB::start_ap()
         dhcp_server_init(&dhcp_, &addr, &mask);
         ap_active_ = AP_ACTIVE_MINUTES * 60 * 2;
 
-        set_flash({1,1,1,0});
+        send_notice(AP_ACTIVE);
     }
     else
     {
@@ -1123,32 +1126,9 @@ void WEB::stop_ap()
     dhcp_server_deinit(&dhcp_);
     cyw43_arch_disable_ap_mode();
     printf("AP deactivated\n");
-    set_flash({1});
+    send_notice(AP_INACTIVE);
 }
 
-void WEB::set_flash(const std::initializer_list<bool> &pattern)
-{
-    flash_pattern_ = pattern;
-    flash_index_ = 0;
-}
-
-void WEB::flash()
-{
-    if (flash_index_ >= flash_pattern_.size())
-    {
-        flash_index_ = 0;
-    }
-    if (flash_pattern_.size() > 0)
-    {
-        bool on = flash_pattern_.at(flash_index_);
-        cyw43_arch_gpio_put(0, on);
-        flash_index_ += 1;
-    }
-    else
-    {
-        cyw43_arch_gpio_put(0, false);
-    }
-}
 
 
 WEB::CLIENT::~CLIENT()

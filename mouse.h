@@ -48,6 +48,8 @@ private:
 
     void (*message_callback_)(const std::string &msg);
     void send_web_message(const std::string &key, const std::string &value);
+    void (*notice_callback_)(int state);
+    void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
 
     static MOUSE        *singleton_;            // Singleton mouse instance pointer
 
@@ -62,6 +64,10 @@ public:
     void keystroke(uint8_t ch);
 
     void set_message_callback(void(*cb)(const std::string &msg)) { message_callback_ = cb; }
+
+    static const int MOUSE_ACTIVE = 201;
+    static const int MOUSE_INACTIVE = 202;
+    void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
 };
 
 #endif
