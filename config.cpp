@@ -45,7 +45,7 @@ bool CONFIG::init()
     if (!ret)
     {
         //  No read set default data
-        strncpy(cfgdata.hostname, "webmouse", sizeof(cfgdata.hostname) - 1);
+        strncpy(cfgdata.hostname, HOSTNAME, sizeof(cfgdata.hostname) - 1);
         strncpy(cfgdata.ssid, WIFI_SSID, sizeof(cfgdata.ssid) - 1);
         strncpy(cfgdata.password, WIFI_PASSWORD, sizeof(cfgdata.password) - 1);
         ret = write_config();

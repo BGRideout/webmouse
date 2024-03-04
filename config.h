@@ -1,8 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define WIFI_SSID "VodafoneMobileWiFi-B56878"
-#define WIFI_PASSWORD "9647950309"
+#define HOSTNAME "webmouse"
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
 
 class CONFIG
 {
