@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <title>Webmouse Setup</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='stylesheet' type='text/css' href='/webmouse.css' />
+  <script type='text/javascript' src='/websocket.js'></script>
+  <script type='text/javascript' src='/config.js'></script>
+ </head>
+ <body>
+  <h1>WiFi Setup</h1>
+  <div class='config'>
+   <label for='hostname'>Host name</label><input type='text' id='hostname' name='hostname' value=''>
+    <span></span>
+   <label for='ssid'>WiFi name</label><input type='text' id='ssid' name='ssid' value=''><span></span>
+   <span></span><select id='ssids'><option value=''>-- Scan WiFi access points --</option></select>
+    <button type='button' name='button' id='scan' value='scan'>Scan</button>
+   <label for='pwd'>Password</label><input type='password' id='pwd' name='pwd' value=''>
+    <span></span>
+   <label for='ip'>IP address</label><span id='ip' class='ip'></span><span></span>
+   <button type='button' name='button' id='update' value='update'>Update</button><span></span>
+  </div>
+  <div class='vspace'></div>
+  <h1>Bluetooth Setup</h1>
+  <div class='config'>
+    <label>PIN</label><span id='pin' class='pin'></span><span></span>
+  </div>
+ </body>
+</html>
+

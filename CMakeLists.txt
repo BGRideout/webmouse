@@ -17,7 +17,10 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 project(webmouse C CXX ASM)
 
-add_executable(${PROJECT_NAME} webmouse.cpp mouse.cpp web.cpp ws.cpp txt.cpp keycode.cpp config.cpp persist.cpp led.cpp dhcpserver/dhcpserver.c
+add_executable(${PROJECT_NAME} webmouse.cpp
+ 	mouse.cpp web.cpp config.cpp
+	ws.cpp txt.cpp keycode.cpp persist.cpp led.cpp
+	dhcpserver/dhcpserver.c	${CMAKE_CURRENT_BINARY_DIR}/generated/web_files.cpp
 	)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR})
@@ -41,4 +44,21 @@ target_link_libraries(${PROJECT_NAME} PUBLIC pico_stdlib ${PLAT_LIBS})
 pico_add_extra_outputs(${PROJECT_NAME})
 
 pico_btstack_make_gatt_header(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/mouse_att.gatt)
+
+find_package (Python3 REQUIRED COMPONENTS Interpreter)
+set(WEB_RESOURCE_FILES data/config.html data/config.js data/index.html data/webmouse.css data/webmouse.js data/websocket.js)
+set(WEB_FILES_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(WEB_FILES "${WEB_FILES_DIR}/web_files.cpp")
+set(WEB_FILES_TARGET "${PROJECT_NAME}_web_files")
+add_custom_target(${WEB_FILES_TARGET} DEPENDS ${WEB_RESOURCE_FILES})
+add_custom_command(
+	OUTPUT ${WEB_FILES}
+	DEPENDS ${WEB_RESOURCE_FILES}
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	COMMAND ${CMAKE_COMMAND} -E make_directory ${WEB_FILES_DIR} &&
+			${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/create_web_files.py -o ${WEB_FILES} ${WEB_RESOURCE_FILES}
+	VERBATIM)
+add_dependencies(${PROJECT_NAME}
+	${WEB_FILES_TARGET}
+	)
 

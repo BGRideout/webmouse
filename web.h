@@ -82,13 +82,6 @@ private:
     static void  tcp_server_err(void *arg, err_t err);
 
     void process_rqst(struct tcp_pcb *client_pcb);
-    void send_home_page(struct tcp_pcb *client_pcb);
-    void send_css_file(struct tcp_pcb *client_pcb);
-    void send_webmouse_js_file(struct tcp_pcb *client_pcb);
-    void send_websocket_js_file(struct tcp_pcb *client_pcb);
-    void send_config_file(struct tcp_pcb *client_pcb);
-    void send_config_js_file(struct tcp_pcb *client_pcb);
-
     void open_websocket(struct tcp_pcb *client_pcb, std::vector<std::string> &headers);
     void process_websocket(struct tcp_pcb *client_pcb);
     void send_websocket(struct tcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask = false);
