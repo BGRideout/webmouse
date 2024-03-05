@@ -272,7 +272,7 @@ void WEB::process_rqst(struct tcp_pcb *client_pcb)
                     u16_t datalen;
                     if (WEB_FILES::get()->get_file(url, data, datalen))
                     {
-                        send_buffer(client_pcb, (void *)data, datalen);
+                        send_buffer(client_pcb, (void *)data, datalen, false);
                     }
                     else
                     {
@@ -463,12 +463,16 @@ void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
     {
         if (!isClosed)
         {
-            printf("Closing %s %p.%s\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb, (ci->second.more_to_send() ? " waiting" : ""));
             ci->second.setClosed();
             if (!ci->second.more_to_send())
             {
                 tcp_close(client_pcb);
+                printf("Closed %s %p. client count = %d\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb, clients_.size() - 1);
                 clients_.erase(ci);
+            }
+            else
+            {
+                printf("Waiting to close %s %p\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb);
             }
         }
         else
