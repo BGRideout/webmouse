@@ -703,21 +703,20 @@ void WEB::start_ap()
     {
         printf("Starting AP webmouse\n");
         cyw43_arch_enable_ap_mode("webmouse", "1234567890", CYW43_AUTH_WPA2_AES_PSK);
+    
+        // Start the dhcp server
         ip4_addr_t addr;
         ip4_addr_t mask;
         IP4_ADDR(ip_2_ip4(&addr), 192, 168, 4, 1);
         IP4_ADDR(ip_2_ip4(&mask), 255, 255, 255, 0);
-    
-        // Start the dhcp server
         dhcp_server_init(&dhcp_, &addr, &mask);
-        ap_active_ = AP_ACTIVE_MINUTES * 60 * 2;
-
-        send_notice(AP_ACTIVE);
     }
     else
     {
-        printf("AP is already active\n");
+        printf("AP is already active. Timer reset.\n");
     }
+    ap_active_ = AP_ACTIVE_MINUTES * 60 * 2;
+    send_notice(AP_ACTIVE);
 }
 
 void WEB::stop_ap()
