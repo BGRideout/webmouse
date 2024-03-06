@@ -264,6 +264,10 @@ void WEB::process_rqst(struct tcp_pcb *client_pcb)
                     {
                         url = "index.html";
                     }
+                    else if (url == "/config")
+                    {
+                        url = "config.html";
+                    }
                     if (url.at(0) == '/')
                     {
                         url = url.substr(1);
@@ -702,7 +706,7 @@ void WEB::start_ap()
     if (ap_active_ == 0)
     {
         printf("Starting AP webmouse\n");
-        cyw43_arch_enable_ap_mode("webmouse", "1234567890", CYW43_AUTH_WPA2_AES_PSK);
+        cyw43_arch_enable_ap_mode("webmouse", "12345678", CYW43_AUTH_WPA2_AES_PSK);
     
         // Start the dhcp server
         ip4_addr_t addr;
