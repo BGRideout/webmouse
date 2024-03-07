@@ -159,11 +159,12 @@ err_t WEB::tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
 err_t WEB::tcp_server_poll(void *arg, struct tcp_pcb *tpcb)
 {
     WEB *web = get();
-    for (auto ci = web->clients_.begin(); ci != web->clients_.end(); ++ci)
+    auto ci = web->clients_.find(tpcb);
+    if (ci != web->clients_.end())
     {
         if (ci->second.more_to_send())
         {
-            printf("Sending to %p on poll\n", ci->first);
+            printf("Sending to %p on poll (%d clients)\n", ci->first, web->clients_.size());
             web->write_next(ci->first);
         }
     }
@@ -227,7 +228,7 @@ err_t WEB::write_next(tcp_pcb *client_pcb)
     }
     else
     {
-        printf("Unknown client %p for web %p (%p)\n", client_pcb, this, WEB::get());
+        printf("Unknown client %p for write\n", client_pcb);
     }
     return err;    
 }
