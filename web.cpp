@@ -78,6 +78,7 @@ bool WEB::connect_to_wifi()
 {
     CONFIG *cfg = CONFIG::get();
     printf("Connecting to Wi-Fi on SSID '%s' ...\n", cfg->ssid());
+    netif_set_hostname(wifi_netif(CYW43_ITF_STA), cfg->hostname());
     return cyw43_arch_wifi_connect_async(cfg->ssid(), cfg->password(), CYW43_AUTH_WPA2_AES_PSK) == 0;
 }
 
@@ -708,6 +709,7 @@ void WEB::start_ap()
     {
         printf("Starting AP webmouse\n");
         cyw43_arch_enable_ap_mode("webmouse", "12345678", CYW43_AUTH_WPA2_AES_PSK);
+        netif_set_hostname(wifi_netif(CYW43_ITF_AP), "webmouse");
     
         // Start the dhcp server
         ip4_addr_t addr;
