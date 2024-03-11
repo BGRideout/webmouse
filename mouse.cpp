@@ -310,12 +310,15 @@ void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
     hids_device_request_can_send_now_event(con_handle);
 }
 
-void MOUSE::keystroke(uint8_t ch)
+void MOUSE::keystroke(uint8_t ch, uint8_t ctrl, uint8_t alt, uint8_t shift)
 {
     uint8_t keycode;
     uint8_t modifier;
     if (KEYCODE::get_code_and_modifier(ch, keycode, modifier))
     {
+        if (ctrl) modifier |= 0x01;
+        if (alt) modifier |= 0x04;
+        if (shift) modifier |= 0x02;
         reports_.emplace_back(REPORT(keycode, modifier));
         hids_device_request_can_send_now_event(con_handle);
     }

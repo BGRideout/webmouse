@@ -61,7 +61,7 @@ public:
     bool is_connectd() const { return con_handle != HCI_CON_HANDLE_INVALID; }
 
     void action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel);
-    void keystroke(uint8_t ch);
+    void keystroke(uint8_t ch, uint8_t ctrl, uint8_t alt, uint8_t shift);
 
     void set_message_callback(void(*cb)(const std::string &msg)) { message_callback_ = cb; }
 

@@ -185,6 +185,9 @@ void web_message(const std::string &msg)
     int8_t wheel;
 
     uint8_t ch = 0;
+    uint8_t ctrl = 0;
+    uint8_t alt = 0;
+    uint8_t shift = 0;
 
     std::vector<std::string> tok;
     TXT::split(msg, " ", tok);
@@ -256,6 +259,18 @@ void web_message(const std::string &msg)
                     ch = rawvalue;
                 }
             }
+            else if (name == "ctrl")
+            {
+                ctrl = value;
+            }
+            else if (name == "alt")
+            {
+                alt = value;
+            }
+            else if (name == "shift")
+            {
+                shift = value;
+            }
         }
     }
 
@@ -265,7 +280,7 @@ void web_message(const std::string &msg)
     }
     if (func == "keyboard")
     {
-        mouse->keystroke(ch);
+        mouse->keystroke(ch, ctrl, alt, shift);
     }
 }
 

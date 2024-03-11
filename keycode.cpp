@@ -6,6 +6,11 @@
 #define CHAR_TAB         '\t'
 #define CHAR_BACKSPACE   0x08
 
+#define CHAR_RIGHT      0x91
+#define CHAR_LEFT       0x92
+#define CHAR_DOWN       0x93
+#define CHAR_UP         0x94
+
 bool KEYCODE::get_code_and_modifier(uint8_t character, uint8_t &keycode, uint8_t &modifier)
 {
     // Simplified US Keyboard with Shift modifier
@@ -26,8 +31,8 @@ bool KEYCODE::get_code_and_modifier(uint8_t character, uint8_t &keycode, uint8_t
         CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 65-68 */
         CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 69-72 */
         CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 73-76 */
-        CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 77-80 */
-        CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 81-84 */
+        CHAR_ILLEGAL, CHAR_ILLEGAL, CHAR_RIGHT,   CHAR_LEFT,                /* 77-80 */
+        CHAR_DOWN,    CHAR_UP,      CHAR_ILLEGAL, CHAR_ILLEGAL,             /* 81-84 */
         '*', '-', '+', '\n', '1', '2', '3', '4', '5',                       /* 85-97 */
         '6', '7', '8', '9', '0', '.', 0xa7,                                 /* 97-100 */
     };
