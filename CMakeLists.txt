@@ -48,7 +48,7 @@ pico_add_extra_outputs(${PROJECT_NAME})
 pico_btstack_make_gatt_header(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/mouse_att.gatt)
 
 find_package (Python3 REQUIRED COMPONENTS Interpreter)
-set(WEB_RESOURCE_FILES data/config.html data/config.js data/index.html data/webmouse.css data/webmouse.js data/websocket.js)
+set(WEB_RESOURCE_FILES data/config.html data/config.js data/index.html data/webmouse.css data/webmouse.js data/websocket.js data/favicon.ico)
 set(WEB_FILES_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(WEB_FILES "${WEB_FILES_DIR}/web_files.cpp")
 set(WEB_FILES_TARGET "${PROJECT_NAME}_web_files")

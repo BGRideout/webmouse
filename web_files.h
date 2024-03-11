@@ -4,11 +4,12 @@
 #include <string>
 #include <stdint.h>
 #include <map>
+#include <utility>
 
 class WEB_FILES
 {
 private:
-    std::map<std::string, const char *> files_;
+    std::map<std::string, std::pair<const char *, int> > files_;
 
     static WEB_FILES *singleton_;
     WEB_FILES();

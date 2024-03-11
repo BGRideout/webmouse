@@ -44,14 +44,17 @@ private:
     {
     private:
         std::string     rqst_;                      // Request message
+        struct tcp_pcb  *pcb_;                      // Client pcb
         bool            closed_;                    // Closed flag
         bool            websocket_;                 // Web socket open flag
 
         std::list<SENDBUF *> sendbuf_;              // Send buffers
         WebsocketPacketHeader_t wshdr_;             // Websocket message header
 
+        CLIENT() : pcb_(nullptr), closed_(true), websocket_(false) {}
+
     public:
-        CLIENT() : closed_(false), websocket_(false) {}
+        CLIENT(struct tcp_pcb *client_pcb) : pcb_(client_pcb), closed_(false), websocket_(false) {}
         ~CLIENT();
 
         void addToRqst(const char *str, u16_t ll);
@@ -62,8 +65,10 @@ private:
         const std::string &rqst() const { return rqst_; }
         const WebsocketPacketHeader_t &wshdr() const { return wshdr_; }
 
+        struct tcp_pcb *pcb() const { return pcb_; }
+
         bool isClosed() const { return closed_; }
-        void setClosed() { closed_ = true; }
+        void setClosed() { closed_ = true; pcb_ = nullptr; }
 
         void setWebSocket() { websocket_ = true; }
         bool isWebSocket() const { return websocket_; }

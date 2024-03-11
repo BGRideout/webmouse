@@ -14,7 +14,7 @@
 #include "hardware/gpio.h"
 
 #define AP_ACTIVE_MINUTES 30
-#define AP_BUTTON 15
+#define AP_BUTTON 16
 
 WEB *WEB::singleton_ = nullptr;
 
@@ -89,7 +89,7 @@ err_t WEB::tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
         printf("Failure in accept %d\n", err);
         return ERR_VAL;
     }
-    web->clients_[client_pcb] = WEB::CLIENT();
+    web->clients_.insert(std::pair<struct tcp_pcb *, WEB::CLIENT>(client_pcb, WEB::CLIENT(client_pcb)));
     printf("Client connected %p (%d clients)\n", client_pcb, web->clients_.size());
 
     tcp_arg(client_pcb, client_pcb);
@@ -163,10 +163,18 @@ err_t WEB::tcp_server_poll(void *arg, struct tcp_pcb *tpcb)
     auto ci = web->clients_.find(tpcb);
     if (ci != web->clients_.end())
     {
-        if (ci->second.more_to_send())
+        //  Test for match on PCB to avoid race condition on close
+        if (ci->second.pcb() == tpcb)
         {
-            printf("Sending to %p on poll (%d clients)\n", ci->first, web->clients_.size());
-            web->write_next(ci->first);
+            if (ci->second.more_to_send())
+            {
+                printf("Sending to %p on poll (%d clients)\n", ci->first, web->clients_.size());
+                web->write_next(ci->first);
+            }
+        }
+        else
+        {
+            printf("Poll on closed pcb %p\n", tpcb);
         }
     }
     return ERR_OK;
@@ -484,6 +492,7 @@ void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
         else
         {
             printf("Closing %s %p for error\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb);
+            ci->second.setClosed();
             clients_.erase(ci);
         }
     }
