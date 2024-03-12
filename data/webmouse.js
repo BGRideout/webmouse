@@ -8,8 +8,10 @@ var r_ = 0;
 var c_ = '';
 var xkshow = 0;
 var xktimer = -1;
-ctrl_ = 0;
-alt_ = 0;
+var ctrl_ = 0;
+var alt_ = 0;
+var msgtimer_ = -1;
+var prevHeight_ = 0;
 
 document.addEventListener('DOMContentLoaded', function()
 {
@@ -34,11 +36,6 @@ document.addEventListener('DOMContentLoaded', function()
     btn.addEventListener('keydown', (e) => {e.preventDefault();});
     btn.addEventListener('click', ekbtn);
   }
-  let blanks = document.querySelectorAll(".extkbd span");
-  for (btn of blanks)
-  {
-    btn.addEventListener('focus', (e) => {document.getElementById('kbd').focus();});
-  }
 
   if ('virtualKeyboard' in navigator)
   {
@@ -53,9 +50,25 @@ document.addEventListener('DOMContentLoaded', function()
     let ekbd = document.getElementById('extkbd');
     ekbd.addEventListener('focusin', focused);
     ekbd.addEventListener('focusout', blurred);
+    window.addEventListener('resize', window_resized);
   }
   openWS();
   setInterval(checkReport, 100);
+
+/*   screen.orientation.lock('portrait')
+  .then((val) =>
+  {
+    let msg = 'Orientation locked: ' + val;
+    post_message(msg);
+    console.log(msg);
+  })
+  .catch((e) => 
+  {
+    let msg = 'Eception setting orientation: ' + e;
+    post_message(msg);
+    console.log(msg);
+  });
+ */
 });
 
 function t_start(e)
@@ -171,16 +184,30 @@ function kbdshow(evt)
   }
   else
   {
-    ekbd.style.visibility = "hidden";
+    ekbd.style.visibility = 'hidden';
     reset_modifiers();
     window.scrollTo(0, 0);
+  }
+}
+
+function window_resized(evt)
+{
+  let chg = window.visualViewport.height - prevHeight_;
+  prevHeight_ = window.visualViewport.height;
+  if (chg > 250)
+  {
+    let ekbd = document.getElementById('extkbd');
+    ekbd.style.visibility = 'hidden';
+    reset_modifiers();
+    window.scrollTo(0, 0);
+    document.getElementById('kbd').blur();
   }
 }
 
 function focused(evt)
 {
   let ekbd = document.getElementById('extkbd');
-  ekbd.style.visibility = "visible";
+  ekbd.style.visibility = 'visible';
   xkshow += 1;
   clearTimeout(xktimer);
 }
@@ -203,6 +230,17 @@ function xktimeout()
     ekbd.style.visibility = "hidden";
     reset_modifiers();
     window.scrollTo(0, 0);
+  }
+}
+
+function post_message(msg, tmo=10)
+{
+  clearTimeout(msgtimer_);
+  let msga = document.getElementById('msgarea');
+  msga.innerHTML = msg;
+  if (tmo > 0)
+  {
+    msgtimer_ = setTimeout(post_message, tmo * 1000, '', 0);
   }
 }
 

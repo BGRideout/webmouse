@@ -4,11 +4,11 @@ h1 {margin: 0px;}
 div {width: 100%;}
 div.mouse {display: flex; flex-direction: column;}
 div.mousearea {flex-grow: 1; flex-shrink: 1; height: 70vh; border: 1px solid black; background: radial-gradient(white, lightblue);}
-div.controls {flex-grow: 0; flex-shrink: 0;}
-div.vspace {height: 32px;}
-div.extkbd {display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 12px; margin-bottom: 50px; visibility: hidden;}
-button.l {width: 40%; height:64px; align:left}
-button.r {width: 40%; height:64px; align:right}
+div.controls {flex-grow: 0; flex-shrink: 0; margin-bottom: 12px;}
+div.vspace {height: 50px; vertical-align: top;}
+div.extkbd {display: grid; grid-template-columns: repeat(5, 1fr); visibility: hidden;}
+button.l {width: 40%; height:64px;}
+button.r {width: 40%; height:64px;}
 button.blank {background: transparent; border: none;}
 input.kbd {width: 5%; margin: 12px; text-align: center;}
 .config {display: grid; grid-template-columns: 3fr 3fr 1fr; row-gap: 8px;}
