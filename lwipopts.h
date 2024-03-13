@@ -8,16 +8,16 @@
 #define MEM_LIBC_MALLOC             0
 #define MEM_ALIGNMENT               4
 #define MEM_SIZE                    16384
-#define MEMP_NUM_TCP_SEG            64
+#define MEMP_NUM_TCP_SEG            128
 #define MEMP_NUM_ARP_QUEUE          10
 #define PBUF_POOL_SIZE              24
 #define LWIP_ARP                    1
 #define LWIP_ETHERNET               1
 #define LWIP_ICMP                   1
 #define LWIP_RAW                    1
-#define TCP_WND                     (8 * TCP_MSS)
 #define TCP_MSS                     1460
-#define TCP_SND_BUF                 (8 * TCP_MSS)
+#define TCP_WND                     (16 * TCP_MSS)
+#define TCP_SND_BUF                 (16 * TCP_MSS)
 #define TCP_SND_QUEUELEN            ((8 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
 #define LWIP_NETIF_STATUS_CALLBACK  1
 #define LWIP_NETIF_LINK_CALLBACK    1
@@ -81,5 +81,11 @@
 
 #define MEMP_NUM_SYS_TIMEOUT   (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 16)
 
+//  For TLS
+#define LWIP_ALTCP                  1
+#define LWIP_ALTCP_TLS              1
+#define LWIP_ALTCP_TLS_MBEDTLS      1
+#define ALTCP_MBEDTLS_DEBUG         LWIP_DBG_ON
+#define ALTCP_MBEDTLS_LIB_DEBUG     LWIP_DBG_ON
 
 #endif /* __LWIPOPTS_H__ */

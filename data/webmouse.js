@@ -11,7 +11,7 @@ var xktimer = -1;
 var ctrl_ = 0;
 var alt_ = 0;
 var msgtimer_ = -1;
-var prevHeight_ = 0;
+var prevHeight_ = window.visualViewport.height;
 
 document.addEventListener('DOMContentLoaded', function()
 {
@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', function()
     let ma = document.getElementById('mousearea');
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener('geometrychange', kbdshow);
+    post_message('Virtual keyboard API exists');
   }
   else
   {
@@ -193,8 +194,9 @@ function kbdshow(evt)
 function window_resized(evt)
 {
   let chg = window.visualViewport.height - prevHeight_;
+  //post_message('Size change ' + chg + '  ' + prevHeight_ + ' to ' + window.visualViewport.height);
   prevHeight_ = window.visualViewport.height;
-  if (chg > 250)
+  if (chg > 40)
   {
     let ekbd = document.getElementById('extkbd');
     ekbd.style.visibility = 'hidden';

@@ -7,10 +7,14 @@
 #include "stdio.h"
 
 #include "pico/cyw43_arch.h"
-#include "mbedtls/sha1.h"
-#include "mbedtls/base64.h"
+#include "lwip/altcp_tcp.h"
+#include "lwip/altcp_tls.h"
 #include "lwip/apps/mdns.h"
 #include "lwip/netif.h"
+#include "lwip/prot/iana.h"
+#include "mbedtls/sha1.h"
+#include "mbedtls/base64.h"
+#include "mbedtls/debug.h"
 #include "hardware/gpio.h"
 
 #define AP_ACTIVE_MINUTES 30
@@ -43,28 +47,55 @@ bool WEB::init()
         return 1;
     }
 
-    struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
+#ifdef USE_HTTPS
+    u16_t port = LWIP_IANA_PORT_HTTPS;
+    const char *pkey;
+    uint16_t    pkeylen;
+    WEB_FILES::get()->get_file("newkey.pem", pkey, pkeylen);
+    const char pkpass[] = "webmouse";
+    uint16_t pkpasslen = sizeof(pkpass);
+    const char *cert;
+    uint16_t    certlen;
+    WEB_FILES::get()->get_file("newcert.pem", cert, certlen);
+    
+    struct altcp_tls_config * conf = altcp_tls_create_config_server_privkey_cert((const u8_t *)pkey, pkeylen + 1,
+                                                                                 (const u8_t *)pkpass, pkpasslen,
+                                                                                 (const u8_t *)cert, certlen + 1);
+    if (!conf)
+    {
+        printf("TLS configuration not loaded\n");
+    }
+    mbedtls_debug_set_threshold(2);
 
-    err_t err = tcp_bind(pcb, NULL, 80);
+    altcp_allocator_t alloc = {altcp_tls_alloc, conf};
+    #else
+    u16_t port = LWIP_IANA_PORT_HTTP;
+    struct altcp_tls_config * conf = nullptr;
+    altcp_allocator_t alloc = {altcp_tcp_alloc, conf};
+    #endif
+
+    struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
+
+    err_t err = altcp_bind(pcb, IP_ANY_TYPE, port);
     if (err)
     {
-        printf("failed to bind to port %u\n", 80);
+        printf("failed to bind to port %u: %d\n", port, err);
         return false;
     }
 
-    server_ = tcp_listen_with_backlog(pcb, 1);
+    server_ = altcp_listen_with_backlog(pcb, 1);
     if (!server_)
     {
         printf("failed to listen\n");
         if (pcb)
         {
-            tcp_close(pcb);
+            altcp_close(pcb);
         }
         return false;
     }
 
-    tcp_arg(server_, this);
-    tcp_accept(server_, tcp_server_accept);
+    altcp_arg(server_, this);
+    altcp_accept(server_, tcp_server_accept);
 
     mdns_resp_init();
     
@@ -82,26 +113,26 @@ bool WEB::connect_to_wifi()
     return cyw43_arch_wifi_connect_async(cfg->ssid(), cfg->password(), CYW43_AUTH_WPA2_AES_PSK) == 0;
 }
 
-err_t WEB::tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
+err_t WEB::tcp_server_accept(void *arg, struct altcp_pcb *client_pcb, err_t err)
 {
     WEB *web = get();
     if (err != ERR_OK || client_pcb == NULL) {
         printf("Failure in accept %d\n", err);
         return ERR_VAL;
     }
-    web->clients_.insert(std::pair<struct tcp_pcb *, WEB::CLIENT>(client_pcb, WEB::CLIENT(client_pcb)));
+    web->clients_.insert(std::pair<struct altcp_pcb *, WEB::CLIENT>(client_pcb, WEB::CLIENT(client_pcb)));
     printf("Client connected %p (%d clients)\n", client_pcb, web->clients_.size());
 
-    tcp_arg(client_pcb, client_pcb);
-    tcp_sent(client_pcb, tcp_server_sent);
-    tcp_recv(client_pcb, tcp_server_recv);
-    tcp_poll(client_pcb, tcp_server_poll, 1 * 2);
-    tcp_err(client_pcb, tcp_server_err);
+    altcp_arg(client_pcb, client_pcb);
+    altcp_sent(client_pcb, tcp_server_sent);
+    altcp_recv(client_pcb, tcp_server_recv);
+    altcp_poll(client_pcb, tcp_server_poll, 1 * 2);
+    altcp_err(client_pcb, tcp_server_err);
 
     return ERR_OK;
 }
 
-err_t WEB::tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+err_t WEB::tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     WEB *web = get();
     if (!p)
@@ -130,7 +161,7 @@ err_t WEB::tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
                 ci->second.addToRqst(buf, l);
             }
         }
-        tcp_recved(tpcb, p->tot_len);
+        altcp_recved(tpcb, p->tot_len);
 
         while (ci->second.rqstIsReady())
         {
@@ -150,14 +181,14 @@ err_t WEB::tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
     return ERR_OK;
 }
 
-err_t WEB::tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
+err_t WEB::tcp_server_sent(void *arg, struct altcp_pcb *tpcb, u16_t len)
 {
     WEB *web = get();
     web->write_next(tpcb);
     return ERR_OK;
 }
 
-err_t WEB::tcp_server_poll(void *arg, struct tcp_pcb *tpcb)
+err_t WEB::tcp_server_poll(void *arg, struct altcp_pcb *tpcb)
 {
     WEB *web = get();
     auto ci = web->clients_.find(tpcb);
@@ -183,7 +214,7 @@ err_t WEB::tcp_server_poll(void *arg, struct tcp_pcb *tpcb)
 void WEB::tcp_server_err(void *arg, err_t err)
 {
     WEB *web = get();
-    tcp_pcb *client_pcb = (tcp_pcb *)arg;
+    altcp_pcb *client_pcb = (altcp_pcb *)arg;
     printf("Error %d on client %p\n", err, client_pcb);
     auto ci = web->clients_.find(client_pcb);
     if (ci != web->clients_.end())
@@ -192,7 +223,7 @@ void WEB::tcp_server_err(void *arg, err_t err)
     }
 }
 
-err_t WEB::send_buffer(struct tcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate)
+err_t WEB::send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate)
 {
     auto ci = clients_.find(client_pcb);
     if (ci != clients_.end())
@@ -203,13 +234,13 @@ err_t WEB::send_buffer(struct tcp_pcb *client_pcb, void *buffer, u16_t buflen, b
     return ERR_OK;
 }
 
-err_t WEB::write_next(tcp_pcb *client_pcb)
+err_t WEB::write_next(altcp_pcb *client_pcb)
 {
     err_t err = ERR_OK;
     auto ci = clients_.find(client_pcb);
     if (ci != clients_.end())
     {
-        u16_t nn = tcp_sndbuf(client_pcb);
+        u16_t nn = altcp_sndbuf(client_pcb);
         if (nn > TCP_MSS)
         {
             nn = TCP_MSS;
@@ -220,8 +251,8 @@ err_t WEB::write_next(tcp_pcb *client_pcb)
         {
             cyw43_arch_lwip_begin();
             cyw43_arch_lwip_check();
-            err = tcp_write(client_pcb, buffer, buflen, 0);
-            tcp_output(client_pcb);
+            err = altcp_write(client_pcb, buffer, buflen, 0);
+            altcp_output(client_pcb);
             cyw43_arch_lwip_end();
             if (err != ERR_OK)
             {
@@ -242,7 +273,7 @@ err_t WEB::write_next(tcp_pcb *client_pcb)
     return err;    
 }
 
-void WEB::process_rqst(struct tcp_pcb *client_pcb)
+void WEB::process_rqst(struct altcp_pcb *client_pcb)
 {
     bool ok = false;
     auto ci = clients_.find(client_pcb);
@@ -312,7 +343,7 @@ void WEB::process_rqst(struct tcp_pcb *client_pcb)
     }
 }
 
-void WEB::open_websocket(struct tcp_pcb *client_pcb, std::vector<std::string> &headers)
+void WEB::open_websocket(struct altcp_pcb *client_pcb, std::vector<std::string> &headers)
 {
     printf("Accepting websocket connection on %p\n", client_pcb);
     auto ci = clients_.find(client_pcb);
@@ -394,7 +425,7 @@ void WEB::open_websocket(struct tcp_pcb *client_pcb, std::vector<std::string> &h
     }
 }
 
-void WEB::process_websocket(struct tcp_pcb *client_pcb)
+void WEB::process_websocket(struct altcp_pcb *client_pcb)
 {
     std::string func;
     auto ci = clients_.find(client_pcb);
@@ -452,7 +483,7 @@ void WEB::process_websocket(struct tcp_pcb *client_pcb)
     }
 }
 
-void WEB::send_websocket(struct tcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask)
+void WEB::send_websocket(struct altcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask)
 {
     std::string msg;
     WS::BuildPacket(opc, payload, msg, mask);
@@ -470,7 +501,7 @@ void WEB::broadcast_websocket(const std::string &txt)
     }
 }
 
-void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
+void WEB::close_client(struct altcp_pcb *client_pcb, bool isClosed)
 {
     auto ci = clients_.find(client_pcb);
     if (ci != clients_.end())
@@ -480,7 +511,7 @@ void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
             ci->second.setClosed();
             if (!ci->second.more_to_send())
             {
-                tcp_close(client_pcb);
+                altcp_close(client_pcb);
                 printf("Closed %s %p. client count = %d\n", (ci->second.isWebSocket() ? "ws" : "http"), client_pcb, clients_.size() - 1);
                 clients_.erase(ci);
             }
@@ -500,7 +531,7 @@ void WEB::close_client(struct tcp_pcb *client_pcb, bool isClosed)
     {
         if (!isClosed)
         {
-            tcp_close(client_pcb);
+            altcp_close(client_pcb);
         }   
     }
 }
@@ -569,7 +600,7 @@ void WEB::check_wifi()
     }
 }
 
-void WEB::get_wifi(struct tcp_pcb *client_pcb)
+void WEB::get_wifi(struct altcp_pcb *client_pcb)
 {
     CONFIG *cfg = CONFIG::get();
     std::string wifi("{\"host\":\"<h>\", \"ssid\":\"<s>\", \"ip\":\"<a>\"}");
@@ -636,7 +667,7 @@ void WEB::update_wifi(const std::string &cmd)
     connect_to_wifi();
 }
 
-void WEB::scan_wifi(struct tcp_pcb *client_pcb)
+void WEB::scan_wifi(struct altcp_pcb *client_pcb)
 {
     if (!cyw43_wifi_scan_active(&cyw43_state))
     {

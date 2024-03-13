@@ -16,6 +16,13 @@ include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+if (${USE-HTTPS} STREQUAL "true")
+	message("Building https version")
+	add_definitions(-DUSE_HTTPS)
+else()
+	message("Building http version")
+endif()
+
 # Add executable. Default name is the project name, version 0.1
 project(webmouse C CXX ASM)
 
@@ -37,18 +44,17 @@ pico_set_program_version(${PROJECT_NAME} "0.1")
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
 
-# Add the standard library to the build
-if (${PICO_BOARD} STREQUAL "pico_w")
-	set(PLAT_LIBS pico_btstack_ble pico_btstack_cyw43 pico_cyw43_arch_lwip_threadsafe_background pico_mbedtls pico_lwip_mdns hardware_flash)
-endif()
-target_link_libraries(${PROJECT_NAME} PUBLIC pico_stdlib ${PLAT_LIBS})
+# Add the libraries to the build
+target_link_libraries(${PROJECT_NAME} PUBLIC pico_stdlib pico_btstack_ble pico_btstack_cyw43 pico_cyw43_arch_lwip_threadsafe_background
+											 pico_lwip_mbedtls pico_mbedtls pico_lwip_mdns hardware_flash)
 
 pico_add_extra_outputs(${PROJECT_NAME})
 
 pico_btstack_make_gatt_header(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR}/mouse_att.gatt)
 
 find_package (Python3 REQUIRED COMPONENTS Interpreter)
-set(WEB_RESOURCE_FILES data/config.html data/config.js data/index.html data/webmouse.css data/webmouse.js data/websocket.js data/favicon.ico)
+set(WEB_RESOURCE_FILES data/config.html data/config.js data/index.html data/webmouse.css data/webmouse.js data/websocket.js data/favicon.ico
+    data/newcert.pem data/newkey.pem)
 set(WEB_FILES_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(WEB_FILES "${WEB_FILES_DIR}/web_files.cpp")
 set(WEB_FILES_TARGET "${PROJECT_NAME}_web_files")

@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "lwip/tcp.h"
+#include "lwip/altcp.h"
 #include "lwip/pbuf.h"
 extern "C" 
 {
@@ -20,7 +20,7 @@ extern "C"
 class WEB
 {
 private:
-    struct tcp_pcb      *server_;                   // Server PCB
+    struct altcp_pcb    *server_;                   // Server PCB
 
     class SENDBUF
     {
@@ -43,10 +43,10 @@ private:
     class CLIENT
     {
     private:
-        std::string     rqst_;                      // Request message
-        struct tcp_pcb  *pcb_;                      // Client pcb
-        bool            closed_;                    // Closed flag
-        bool            websocket_;                 // Web socket open flag
+        std::string         rqst_;                  // Request message
+        struct altcp_pcb    *pcb_;                  // Client pcb
+        bool                closed_;                // Closed flag
+        bool                websocket_;             // Web socket open flag
 
         std::list<SENDBUF *> sendbuf_;              // Send buffers
         WebsocketPacketHeader_t wshdr_;             // Websocket message header
@@ -54,7 +54,7 @@ private:
         CLIENT() : pcb_(nullptr), closed_(true), websocket_(false) {}
 
     public:
-        CLIENT(struct tcp_pcb *client_pcb) : pcb_(client_pcb), closed_(false), websocket_(false) {}
+        CLIENT(struct altcp_pcb *client_pcb) : pcb_(client_pcb), closed_(false), websocket_(false) {}
         ~CLIENT();
 
         void addToRqst(const char *str, u16_t ll);
@@ -65,7 +65,7 @@ private:
         const std::string &rqst() const { return rqst_; }
         const WebsocketPacketHeader_t &wshdr() const { return wshdr_; }
 
-        struct tcp_pcb *pcb() const { return pcb_; }
+        struct altcp_pcb *pcb() const { return pcb_; }
 
         bool isClosed() const { return closed_; }
         void setClosed() { closed_ = true; pcb_ = nullptr; }
@@ -78,30 +78,30 @@ private:
         bool more_to_send() const { return sendbuf_.size() > 0; }
         void requeue(void *buffer, u16_t buflen);
     };
-    std::map<struct tcp_pcb *, CLIENT> clients_;    // Connected clients
+    std::map<struct altcp_pcb *, CLIENT> clients_;    // Connected clients
 
-    static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err);
-    static err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
-    static err_t tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
-    static err_t tcp_server_poll(void *arg, struct tcp_pcb *tpcb);
+    static err_t tcp_server_accept(void *arg, struct altcp_pcb *client_pcb, err_t err);
+    static err_t tcp_server_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t err);
+    static err_t tcp_server_sent(void *arg, struct altcp_pcb *tpcb, u16_t len);
+    static err_t tcp_server_poll(void *arg, struct altcp_pcb *tpcb);
     static void  tcp_server_err(void *arg, err_t err);
 
-    void process_rqst(struct tcp_pcb *client_pcb);
-    void open_websocket(struct tcp_pcb *client_pcb, std::vector<std::string> &headers);
-    void process_websocket(struct tcp_pcb *client_pcb);
-    void send_websocket(struct tcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask = false);
+    void process_rqst(struct altcp_pcb *client_pcb);
+    void open_websocket(struct altcp_pcb *client_pcb, std::vector<std::string> &headers);
+    void process_websocket(struct altcp_pcb *client_pcb);
+    void send_websocket(struct altcp_pcb *client_pcb, enum WebSocketOpCode opc, const std::string &payload, bool mask = false);
 
-    void close_client(struct tcp_pcb *client_pcb, bool isClosed = false);
+    void close_client(struct altcp_pcb *client_pcb, bool isClosed = false);
 
     int  wifi_state_;
     ip_addr_t wifi_addr_;
     bool connect_to_wifi();
     void check_wifi();
-    void get_wifi(struct tcp_pcb *client_pcb);
+    void get_wifi(struct altcp_pcb *client_pcb);
     void update_wifi(const std::string &cmd);
-    std::set<struct tcp_pcb *> scans_;
+    std::set<struct altcp_pcb *> scans_;
     std::map<std::string, int> ssids_;
-    void scan_wifi(struct tcp_pcb *client_pcb);
+    void scan_wifi(struct altcp_pcb *client_pcb);
     static int scan_cb(void *arg, const cyw43_ev_scan_result_t *rslt);
     void check_scan_finished();
     repeating_timer_t timer_;
@@ -121,8 +121,8 @@ private:
     static WEB          *singleton_;                // Singleton pointer
     WEB();
 
-    err_t send_buffer(struct tcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate = true);
-    err_t write_next(struct tcp_pcb *client_pcb);
+    err_t send_buffer(struct altcp_pcb *client_pcb, void *buffer, u16_t buflen, bool allocate = true);
+    err_t write_next(struct altcp_pcb *client_pcb);
 
     void (*message_callback_)(const std::string &msg);
     void (*notice_callback_)(int state);

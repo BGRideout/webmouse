@@ -1,0 +1,5 @@
+{
+    "cmake.configureArgs": [
+        "-DUSE-HTTPS=false"
+    ]
+}

@@ -37,7 +37,7 @@ for file in p.files:
     mime = mimetypes.guess_type(file.name)[0]
     ms = mime.split('/')
     hdr = b"HTTP/1.0 200 OK\r\nContent-type: " + mime.encode() + b"\r\n\r\n"
-    if ms[0] == 'text' or 'ml' in ms[1]:
+    if ms[0] == 'text' or 'xml' in ms[1] or ms[1] == 'pem-certificate-chain':
         p.o.writelines("        \"" + escape_bytes(hdr) + "\"\n")
         while True:
             d = file.readline()

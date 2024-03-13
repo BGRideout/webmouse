@@ -4,5 +4,4 @@ generated/*
 *.cmake
 bgrtmp*
 test.py
-.vscode/*
 
