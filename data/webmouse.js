@@ -12,6 +12,8 @@ var ctrl_ = 0;
 var alt_ = 0;
 var msgtimer_ = -1;
 var prevHeight_ = window.visualViewport.height;
+var led_ = 0x0f;
+var ping_ = true;
 
 document.addEventListener('DOMContentLoaded', function()
 {
@@ -53,23 +55,13 @@ document.addEventListener('DOMContentLoaded', function()
     ekbd.addEventListener('focusout', blurred);
     window.addEventListener('resize', window_resized);
   }
-  openWS();
-  setInterval(checkReport, 100);
 
-/*   screen.orientation.lock('portrait')
-  .then((val) =>
-  {
-    let msg = 'Orientation locked: ' + val;
-    post_message(msg);
-    console.log(msg);
-  })
-  .catch((e) => 
-  {
-    let msg = 'Eception setting orientation: ' + e;
-    post_message(msg);
-    console.log(msg);
-  });
- */
+  document.addEventListener('ws_state', ws_state_change);
+  document.addEventListener('ws_message', process_ws_message);
+  openWS();
+
+  setInterval(checkReport, 100);
+  setInterval(checkConnection, 10000);
 });
 
 function t_start(e)
@@ -244,7 +236,81 @@ function post_message(msg, tmo=10)
   }
 }
 
-function process_ws_message(evt)
+function ws_state_change(evt)
 {
+  if (evt.detail.obj['open'])
+  {
+    sendToWS('func=get_state');
+    led_ &= ~8;
+  }
+  else
+  {
+    led_ |= 8;
+  }
+  show_led();
 }
 
+function process_ws_message(evt)
+{
+  try
+  {
+    let msg = JSON.parse(evt.detail.message);
+    if (Object.hasOwn(msg, 'mouse'))
+    {
+      if (Number(msg['mouse']) == 0) {led_ &= ~4;} else {led_ |= 4;}
+      if (Number(msg['wifi']) == 0) {led_ &= ~2;} else {led_ |= 2;}
+      if (Number(msg['ap']) == 0) {led_ &= ~1;} else {led_ |= 1;}
+      show_led();
+    }
+  }
+  catch(e)
+  {
+    console.log(e);
+  }
+  ping_ = true;
+}
+
+function show_led()
+{
+  let color = 'red';
+  if ((led_ & 8) == 0)
+  {
+    color = 'blue';
+    if ((led_ & 4) == 0)
+    {
+      color = 'orange';
+      if ((led_ & 2) == 0)
+      {
+        color = 'yellow';
+        if ((led_ & 1) == 0)
+        {
+          color = "lightgreen"
+        }
+      }
+    }
+  }
+
+  let html =  "<svg viewbox='0 0 25 25' width='25' height='25' xmlns='http://www.w3.org/2000/svg'>" +
+  "<circle cx='12' cy='12' r='9' fill='" + color + "' stroke='white' stroke-width='3' /></svg>";
+
+  let led = document.getElementById("led");
+  led.innerHTML = html;
+}
+
+function checkConnection()
+{
+  if (isWSOpen())
+  {
+    if (ping_)
+    {
+      ping_ = false;
+      sendToWS('func=get_state')
+    }
+    else
+    {
+      closeWS();
+      openWS();
+      ping_ = true;
+    }
+  }
+}

@@ -303,28 +303,34 @@ void MOUSE::mousing_can_send_now(void)
 
 void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
 {
-    if (reports_.size() == 0 || !reports_.back().add_mouse(dx, dy, buttons, wheel))
+    if (is_connected())
     {
-        reports_.emplace_back(REPORT(dx, dy, buttons, wheel));
+        if (reports_.size() == 0 || !reports_.back().add_mouse(dx, dy, buttons, wheel))
+        {
+            reports_.emplace_back(REPORT(dx, dy, buttons, wheel));
+        }
+        hids_device_request_can_send_now_event(con_handle);
     }
-    hids_device_request_can_send_now_event(con_handle);
 }
 
 void MOUSE::keystroke(uint8_t ch, uint8_t ctrl, uint8_t alt, uint8_t shift)
 {
-    uint8_t keycode;
-    uint8_t modifier;
-    if (KEYCODE::get_code_and_modifier(ch, keycode, modifier))
+    if (is_connected())
     {
-        if (ctrl) modifier |= 0x01;
-        if (alt) modifier |= 0x04;
-        if (shift) modifier |= 0x02;
-        reports_.emplace_back(REPORT(keycode, modifier));
-        hids_device_request_can_send_now_event(con_handle);
-    }
-    else
-    {
-        printf("Unsupported character %2.2x\n", ch);
+        uint8_t keycode;
+        uint8_t modifier;
+        if (KEYCODE::get_code_and_modifier(ch, keycode, modifier))
+        {
+            if (ctrl) modifier |= 0x01;
+            if (alt) modifier |= 0x04;
+            if (shift) modifier |= 0x02;
+            reports_.emplace_back(REPORT(keycode, modifier));
+            hids_device_request_can_send_now_event(con_handle);
+        }
+        else
+        {
+            printf("Unsupported character %2.2x\n", ch);
+        }
     }
 }
 

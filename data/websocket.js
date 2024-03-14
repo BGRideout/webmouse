@@ -3,12 +3,14 @@ var ws = undefined;             // WebSocket object
 var timer_ = undefined;         // Reconnect timer
 var conchk_ = undefined;        // Connection check timer
 var opened_ = false;            // Connection opened flag
+var closed_ = true;             // Websocket closed flag
 var suspended_ = false;         // I/O suspended flag
 
 function openWS()
 {
     if ('WebSocket' in window)
     {
+        closed_ = false;
         if (typeof ws === 'object')
         {
             console.log('Closing old connection');
@@ -48,7 +50,10 @@ function openWS()
 
         ws.onmessage = function(evt)
         {
-            process_ws_message(evt);
+            let obj = new Object;
+            obj['open'] = opened_;
+            const mevt = new CustomEvent('ws_message', { detail: { message: evt.data } });
+            document.dispatchEvent(mevt);
         };
 
         ws.onerror = function(error)
@@ -120,9 +125,26 @@ function setWSOpened(state)
   }
 }
 
+function isWSOpen()
+{
+    return opened_;
+}
+
+function closeWS()
+{
+    closed_ = true;
+    if (typeof ws === 'object')
+    {
+        console.log('Closing websocket');
+        ws.close();
+        ws = undefined;
+    }
+    setWSOpened(false);
+}
+
 function retryConnection()
 {
-    if (!suspended_)
+    if (!suspended_ && !closed_)
     {
         if (typeof ws !== 'object')
         {
@@ -136,7 +158,7 @@ function sendToWS(msg)
     if (typeof ws === 'object')
     {
         ws.send(msg);
-        console.log('Sent: ' + msg);
+        //console.log('Sent: ' + msg);
     }
     else
     {

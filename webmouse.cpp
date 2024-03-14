@@ -43,12 +43,21 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
     }
 }
 
+static int wifi_ap = 0;
+static int wifi_sta = -1;
+static int ble = -1;
+
+void send_state()
+{
+    std::string msg("{\"ap\":\"<wifi_ap>\", \"wifi\":\"<wifi_sta>\", \"mouse\":\"<ble>\"}");
+    TXT::substitute(msg, "<wifi_ap>", std::to_string(wifi_ap));
+    TXT::substitute(msg, "<wifi_sta>", std::to_string(wifi_sta));
+    TXT::substitute(msg, "<ble>", std::to_string(ble));
+    WEB::get()->broadcast_websocket(msg);
+}
+
 void state_callback(int state)
 {
-    static int wifi_ap = 0;
-    static int wifi_sta = -1;
-    static int ble = -1;
-
     bool change = false;
     int newval;
     switch (state)
@@ -104,6 +113,7 @@ void state_callback(int state)
         if (ble) led->add_to_pattern(MOUSE_PATTERN);
         led->end_pattern_update();
         printf("LED pattern %d %d %d\n", wifi_ap, wifi_sta, ble);
+        send_state();
     }
 }
 
@@ -170,13 +180,6 @@ void mouse_message(const std::string &msg)
 
 void web_message(const std::string &msg)
 {
-    MOUSE *mouse = MOUSE::get();
-    if (!mouse->is_connectd()) 
-    {
-        printf("Mouse not connected, ignoring\n");
-        return;
-    }
-
     std::string func;
 
     int8_t dx = 0;
@@ -276,12 +279,16 @@ void web_message(const std::string &msg)
 
     if (func == "mouse")
     {
-        mouse->action(dx, dy, buttons, wheel);
+        MOUSE::get()->action(dx, dy, buttons, wheel);
     }
-    if (func == "keyboard")
+    else if (func == "keyboard")
     {
-        mouse->keystroke(ch, ctrl, alt, shift);
+        MOUSE::get()->keystroke(ch, ctrl, alt, shift);
     }
+    else if (func == "get_state")
+    {
+        send_state();
+    } 
 }
 
 int main(int argc, const char *argv[])
