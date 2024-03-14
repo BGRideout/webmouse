@@ -176,8 +176,6 @@ function kbdshow(evt)
 {
   let ekbd = document.getElementById('extkbd');
   const { x, y, width, height } = evt.target.boundingRect;
-  let ma = document.getElementById('mousearea');
-  ma.innerHTML = ma.innerHTML + '<br>' + evt.target.boundingRect;
   if (height > 16)
   {
     ekbd.style.visibility = "visible";

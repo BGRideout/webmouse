@@ -19,6 +19,7 @@ pico_sdk_init()
 if (${USE-HTTPS} STREQUAL "true")
 	message("Building https version")
 	add_definitions(-DUSE_HTTPS)
+	set(CERTS data/newcert.pem data/newkey.pem)
 else()
 	message("Building http version")
 endif()
@@ -54,7 +55,7 @@ pico_btstack_make_gatt_header(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_LIST_DIR
 
 find_package (Python3 REQUIRED COMPONENTS Interpreter)
 set(WEB_RESOURCE_FILES data/config.html data/config.js data/index.html data/webmouse.css data/webmouse.js data/websocket.js data/favicon.ico
-    data/newcert.pem data/newkey.pem)
+    ${CERTS})
 set(WEB_FILES_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(WEB_FILES "${WEB_FILES_DIR}/web_files.cpp")
 set(WEB_FILES_TARGET "${PROJECT_NAME}_web_files")

@@ -16,8 +16,13 @@ function openWS()
             ws = undefined;
         }
         setWSOpened(false);
-        console.log('ws://' + location.host + '/ws/');
-        ws = new WebSocket('ws://' + location.host + '/ws/');
+        let url = 'ws://' + location.host + '/ws/';
+        if (location.protocol == 'https:')
+        {
+            url = 'wss://' + location.host + '/ws/';
+        }
+        console.log(url);
+        ws = new WebSocket(url);
         if (conchk_ === undefined)
         {
             conchk_ = setTimeout(checkOpenState, 250);

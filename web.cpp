@@ -47,6 +47,8 @@ bool WEB::init()
         return 1;
     }
 
+    mdns_resp_init();
+
 #ifdef USE_HTTPS
     u16_t port = LWIP_IANA_PORT_HTTPS;
     const char *pkey;
@@ -65,7 +67,7 @@ bool WEB::init()
     {
         printf("TLS configuration not loaded\n");
     }
-    mbedtls_debug_set_threshold(2);
+    mbedtls_debug_set_threshold(1);
 
     altcp_allocator_t alloc = {altcp_tls_alloc, conf};
     #else
@@ -96,8 +98,6 @@ bool WEB::init()
 
     altcp_arg(server_, this);
     altcp_accept(server_, tcp_server_accept);
-
-    mdns_resp_init();
     
     add_repeating_timer_ms(500, timer_callback, this, &timer_);
     enable_ap_button();
@@ -295,6 +295,7 @@ void WEB::process_rqst(struct altcp_pcb *client_pcb)
             {
                 ok = true;
                 std::string url = tokens.at(1);
+                printf("GET %s from %p\n", url.c_str(), client_pcb);
                 if (url == "/ws/")
                 {
                     open_websocket(client_pcb, lines);
