@@ -11,7 +11,8 @@ var xktimer = -1;
 var ctrl_ = 0;
 var alt_ = 0;
 var msgtimer_ = -1;
-var prevHeight_ = window.visualViewport.height;
+var prevHeight_ = 0;
+var prevWidth_ = 0;
 var led_ = 0x0f;
 var ping_ = true;
 
@@ -49,10 +50,12 @@ document.addEventListener('DOMContentLoaded', function()
   else
   {
     kbd.addEventListener('focus', focused);
-    kbd.addEventListener('blur', blurred);
-    let ekbd = document.getElementById('extkbd');
-    ekbd.addEventListener('focusin', focused);
-    ekbd.addEventListener('focusout', blurred);
+    // kbd.addEventListener('blur', blurred);
+    // let ekbd = document.getElementById('extkbd');
+    // ekbd.addEventListener('focusin', focused);
+    // ekbd.addEventListener('focusout', blurred);
+    prevHeight_ = window.visualViewport.height;
+    prevWidth_ = window.visualViewport.width;
     window.addEventListener('resize', window_resized);
   }
 
@@ -164,65 +167,76 @@ function report()
   sendToWS(txt);
 }
 
+// Used when VirtualKeyboard interface availble (https)
 function kbdshow(evt)
 {
   let ekbd = document.getElementById('extkbd');
   const { x, y, width, height } = evt.target.boundingRect;
   if (height > 16)
   {
-    ekbd.style.visibility = "visible";
-    window.scrollTo(0, document.body.scrollHeight);
+    show_ekbd();
   }
   else
   {
-    ekbd.style.visibility = 'hidden';
-    reset_modifiers();
-    window.scrollTo(0, 0);
+    hide_ekbd();
   }
+}
+
+// When no VirtualKeyboard, show extended keys on kbd focused and
+// hide when window expands again and stays so for 100 ms
+function focused(evt)
+{
+  show_ekbd();
+  prevWidth_ = window.visualViewport.width;
+  clearTimeout(xktimer);
 }
 
 function window_resized(evt)
 {
-  let chg = window.visualViewport.height - prevHeight_;
-  //post_message('Size change ' + chg + '  ' + prevHeight_ + ' to ' + window.visualViewport.height);
-  prevHeight_ = window.visualViewport.height;
-  if (chg > 40)
+  let w = window.visualViewport.width;
+  if (w == prevWidth_)
   {
-    let ekbd = document.getElementById('extkbd');
-    ekbd.style.visibility = 'hidden';
-    reset_modifiers();
-    window.scrollTo(0, 0);
-    document.getElementById('kbd').blur();
+    let chg = window.visualViewport.height - prevHeight_;
+    if (chg > 40)
+    {
+      xktimer = setTimeout(xktimeout, 100);
+    }
+    else
+    {
+      prevHeight_ = window.visualViewport.height;
+    }
   }
-}
-
-function focused(evt)
-{
-  let ekbd = document.getElementById('extkbd');
-  ekbd.style.visibility = 'visible';
-  xkshow += 1;
-  clearTimeout(xktimer);
-}
-
-function blurred(evt)
-{
-  xkshow -= 1;
-  if (xkshow <= 0)
+  else
   {
-    xkshow = 0
-    setTimeout(xktimeout, 250);
+    prevWidth_ = w;
+    hide_ekbd();
   }
 }
 
 function xktimeout()
 {
-  if (xkshow == 0)
+  let chg = window.visualViewport.height - prevHeight_;
+  prevHeight_ = window.visualViewport.height;
+  if (chg != 0)
   {
-    let ekbd = document.getElementById('extkbd');
-    ekbd.style.visibility = "hidden";
-    reset_modifiers();
-    window.scrollTo(0, 0);
+    hide_ekbd();
+    document.getElementById('kbd').blur();
   }
+}
+
+function show_ekbd()
+{
+  let ekbd = document.getElementById('extkbd');
+  ekbd.style.visibility = "visible";
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function hide_ekbd()
+{
+  let ekbd = document.getElementById('extkbd');
+  ekbd.style.visibility = 'hidden';
+  reset_modifiers();
+  window.scrollTo(0, 0);
 }
 
 function post_message(msg, tmo=10)
