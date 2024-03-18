@@ -68,6 +68,7 @@
 
 #define MOUSE_REPORT_ID 1
 #define KEYBOARD_REPORT_ID 2
+#define CONSUMER_REPORT_ID 3
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
@@ -185,14 +186,35 @@ bool MOUSE::init(async_context_t *context)
         0x95, 0x06,                    //   Report Count (6)
         0x75, 0x08,                    //   Report Size (8)
         0x15, 0x00,                    //   Logical Minimum (0)
-        0x25, 0xff,                    //   Logical Maximum (1)
+        0x25, 0xff,                    //   Logical Maximum (ff)
         0x05, 0x07,                    //   Usage Page (Key codes)
         0x19, 0x00,                    //   Usage Minimum (Reserved (no event indicated))
         0x29, 0xff,                    //   Usage Maxium (Reserved)
         0x81, 0x00,                    //   Input (Data, Array)
 
         0xc0,                          // End collection
-    };
+    
+        //  Consumer (A/V) control
+        0x05, 0x0C,                     // Usage Page (Consumer)
+        0x09, 0x01,                     // Usage (Consumer Control)
+        0xA1, 0x01,                     // Collection (Application)
+        0x85, CONSUMER_REPORT_ID,       //     Report Id
+        0x15, 0x00,                     //     Logical minimum (0)
+        0x25, 0x01,                     //     Logical maximum (1)
+
+        0x09, 0xEA,                     //     Usage (Volumn Down)
+        0x09, 0xE9,                     //     Usage (Volumn Up)
+        0x09, 0xE2,                     //     Usage (Mute)
+        0x09, 0xCD,                     //     Usage (Play/Pause)
+
+        0x19, 0xB5,                     //     Usage Min (Net, Prev, Stop, Eject)
+        0x29, 0xB8,                     //     Usage Max
+
+        0x75, 0x01,                     //     Report Size (1)
+        0x95, 0x08,                     //     Report Count (8)
+        0x81, 0x02,                     //     Input (Data,Value,Relative,Bit Field)
+        0xC0,                           // End Collection
+};
 
     //hci_dump_init(hci_dump_embedded_stdout_get_instance());
     //att_dump_attributes();
@@ -332,6 +354,45 @@ void MOUSE::keystroke(uint8_t ch, uint8_t ctrl, uint8_t alt, uint8_t shift)
             printf("Unsupported character %2.2x\n", ch);
         }
     }
+}
+
+void MOUSE::av_control(const std::string &control)
+{
+    uint8_t code = 0;
+    if (control == "vol-")
+    {
+        code = 0x01;
+    }
+    else if (control == "vol+")
+    {
+        code = 0x02;
+    }
+    else if (control == "mute")
+    {
+        code = 0x04;
+    }
+    else if (control == "play")
+    {
+        code = 0x08;
+    }
+    else if (control == "next")
+    {
+        code = 0x10;
+    }
+    else if (control == "prev")
+    {
+        code = 0x20;
+    }
+    else if (control == "stop")
+    {
+        code = 0x40;
+    }
+    else if (control == "ejct")
+    {
+        code = 0x80;
+    }
+    reports_.emplace_back(REPORT(code));
+    hids_device_request_can_send_now_event(con_handle);
 }
 
 void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size)
@@ -502,6 +563,17 @@ bool MOUSE::REPORT::get_report(uint16_t &report_id, uint8_t *buffer, size_t bufl
             ret = true;
         }
     }
+    else if (type_ == RPT_CONSUMER)
+    {
+        if (buflen >= 2)
+        {
+            report_id = CONSUMER_REPORT_ID;
+            buffer[ii++] = buttons_;
+            rptsize = 1;
+            ret = true;
+        }
+    }
+
     for (; ii < buflen; ii++)
     {
         buffer[ii] = 0;

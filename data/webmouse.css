@@ -5,9 +5,12 @@ div {width: 100%;}
 div.mouse {display: flex; flex-direction: column;}
 div.mousearea {flex-grow: 1; flex-shrink: 1; height: 70vh; border: 1px solid black; background: radial-gradient(white, lightblue);}
 div.controls {flex-grow: 0; flex-shrink: 0; margin-bottom: 12px;}
+div.msgarea {height: 80px; vertical-align: top;}
 div.vspace {height: 50px; vertical-align: top;}
-div.extkbd {display: grid; grid-template-columns: repeat(5, 1fr); visibility: hidden; row-gap: 4px; column-gap: 4px;}
+div.extkbd {display: None; grid-template-columns: repeat(5, 1fr); row-gap: 4px; column-gap: 4px;}
 .extkbd button {height: 32px;}
+div.av_control {display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; column-gap: 4px; margin-bottom: 12px;}
+.av_control button {height: 32px;}
 button.l {width: 40%; height:64px;}
 button.r {width: 40%; height:64px;}
 button.blank {background: transparent; border: none;}

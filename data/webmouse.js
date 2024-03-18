@@ -40,6 +40,13 @@ document.addEventListener('DOMContentLoaded', function()
     btn.addEventListener('click', ekbtn);
   }
 
+  btns = document.querySelectorAll(".av_control button");
+  for (btn of btns)
+  {
+    btn.addEventListener('pointerdown', avbtndown);
+    btn.addEventListener('pointerup', avbtnup);
+  }
+
   if ('virtualKeyboard' in navigator)
   {
     let ma = document.getElementById('mousearea');
@@ -114,7 +121,6 @@ function keystroke(e, updown)
 function ekbtn(evt)
 {
   let code = Number(evt.srcElement.getAttribute('code'));
-  console.log(code);
   let kbd = document.getElementById('kbd');
   kbd.focus();
   if (code == -1)
@@ -133,6 +139,21 @@ function ekbtn(evt)
     sendToWS(txt);
     reset_modifiers();
   }
+}
+
+function avbtndown(evt)
+{
+  console.log(evt);
+  let code = evt.srcElement.getAttribute('code');
+  let txt = 'func=av_control code=' + code;
+  sendToWS(txt);
+}
+
+function avbtnup(evt)
+{
+  console.log(evt);
+  let txt = 'func=av_control code=none';
+  sendToWS(txt);
 }
 
 function show_modifiers()
@@ -226,15 +247,19 @@ function xktimeout()
 
 function show_ekbd()
 {
+  let av = document.getElementById('av_control');
+  av.style.display = 'none';
   let ekbd = document.getElementById('extkbd');
-  ekbd.style.visibility = "visible";
+  ekbd.style.display = "grid";
   window.scrollTo(0, document.body.scrollHeight);
 }
 
 function hide_ekbd()
 {
   let ekbd = document.getElementById('extkbd');
-  ekbd.style.visibility = 'hidden';
+  ekbd.style.display = 'none';
+  let av = document.getElementById('av_control');
+  av.style.display = 'grid';
   reset_modifiers();
   window.scrollTo(0, 0);
 }

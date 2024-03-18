@@ -181,6 +181,7 @@ void mouse_message(const std::string &msg)
 void web_message(const std::string &msg)
 {
     std::string func;
+    std::string code;
 
     int8_t dx = 0;
     int8_t dy = 0;
@@ -275,6 +276,13 @@ void web_message(const std::string &msg)
                 shift = value;
             }
         }
+        else if (func == "av_control")
+        {
+            if (name == "code")
+            {
+                code = val.at(1);
+            }
+        }
     }
 
     if (func == "mouse")
@@ -284,6 +292,10 @@ void web_message(const std::string &msg)
     else if (func == "keyboard")
     {
         MOUSE::get()->keystroke(ch, ctrl, alt, shift);
+    }
+    else if (func == "av_control")
+    {
+        MOUSE::get()->av_control(code);
     }
     else if (func == "get_state")
     {
