@@ -207,7 +207,7 @@ bool MOUSE::init(async_context_t *context)
         0x09, 0xE2,                     //     Usage (Mute)
         0x09, 0xCD,                     //     Usage (Play/Pause)
 
-        0x19, 0xB5,                     //     Usage Min (Net, Prev, Stop, Eject)
+        0x19, 0xB5,                     //     Usage Min (Next, Prev, Stop, Eject)
         0x29, 0xB8,                     //     Usage Max
 
         0x75, 0x01,                     //     Report Size (1)
