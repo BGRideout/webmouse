@@ -8,7 +8,7 @@ LED *LED::singleton_ = nullptr;
 LED::LED() : on_(false), flash_index_(0), updating_(false)
 {
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
-    add_repeating_timer_ms(250, timer_callback, this, &timer_);
+    add_repeating_timer_ms(150, timer_callback, this, &timer_);
 }
 
 void LED::set_flash(const std::initializer_list<bool> &pattern)

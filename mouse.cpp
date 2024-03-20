@@ -77,16 +77,7 @@ MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(
 
 }
 
-MOUSE *MOUSE::get()
-{
-    if (!singleton_)
-    {
-        singleton_ = new MOUSE();
-    }
-    return singleton_;
-}
-
-bool MOUSE::init(async_context_t *context)
+bool MOUSE::init()
 {
     // setup l2cap and
     l2cap_init();
@@ -214,7 +205,7 @@ bool MOUSE::init(async_context_t *context)
         0x95, 0x08,                     //     Report Count (8)
         0x81, 0x02,                     //     Input (Data,Value,Relative,Bit Field)
         0xC0,                           // End Collection
-};
+    };
 
     //hci_dump_init(hci_dump_embedded_stdout_get_instance());
     //att_dump_attributes();
@@ -234,7 +225,7 @@ bool MOUSE::init(async_context_t *context)
         0x03, BLUETOOTH_DATA_TYPE_APPEARANCE, 0xC2, 0x03,
         // Appearance HID - Keyboard (Category 15, Sub-Category 1)
         //0x03, BLUETOOTH_DATA_TYPE_APPEARANCE, 0xC1, 0x03,
-};
+    };
     uint8_t adv_data_len = sizeof(adv_data);
 
     uint16_t adv_int_min = 0x0030;
@@ -400,6 +391,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
     UNUSED(channel);
     UNUSED(packet_size);
     uint16_t conn_interval;
+    bd_addr_t local_addr;
 
     if (packet_type != HCI_EVENT_PACKET) return;
 
@@ -484,6 +476,12 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
                 default:
                     break;
             }
+            break;
+
+        case BTSTACK_EVENT_STATE:
+            if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) return;
+            gap_local_bd_addr(local_addr);
+            printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
             break;
             
         default:

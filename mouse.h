@@ -2,7 +2,6 @@
 #define MOUSE_H
 
 #include "btstack.h"
-#include <pico/async_context.h>
 
 #include <list>
 #include <string>
@@ -57,8 +56,9 @@ private:
     MOUSE();
 
 public:
-    static MOUSE *get();
-    bool init(async_context_t *context);
+    static MOUSE *get() { if (!singleton_) {singleton_ = new MOUSE();} return singleton_;}
+    bool init();
+    void run() {btstack_run_loop_execute();}
     bool is_connected() const { return con_handle != HCI_CON_HANDLE_INVALID; }
 
     void action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel);

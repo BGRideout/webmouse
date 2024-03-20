@@ -1,14 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "btstack_event.h"
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
-#include "hal_led.h"
-#include "btstack.h"
-
-#ifdef HAVE_BTSTACK_STDIN
-#include "btstack_stdin.h"
-#endif
 
 #include "mouse.h"
 #include "web.h"
@@ -18,30 +11,11 @@
 
 #include <stdexcept>
 
-#define INIT_PATTERN {0, 1}
+#define INIT_PATTERN {0, 0, 0, 0, 0, 1}
 #define HEADER_PATTERN {1, 1, 1}
-#define WIFI_AP_PATTERN {1, 1, 0}
-#define WIFI_STA_PATTERN {1, 1, 0, 1, 0}
-#define MOUSE_PATTERN {1, 1, 0, 1, 0, 1, 0}
-
-static btstack_packet_callback_registration_t hci_event_callback_registration;
-static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
-{
-    UNUSED(size);
-    UNUSED(channel);
-    bd_addr_t local_addr;
-    if (packet_type != HCI_EVENT_PACKET) return;
-    switch(hci_event_packet_get_type(packet))
-    {
-        case BTSTACK_EVENT_STATE:
-            if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) return;
-            gap_local_bd_addr(local_addr);
-            printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
-            break;
-        default:
-            break;
-    }
-}
+#define WIFI_AP_PATTERN {1, 1, 1, 0}
+#define WIFI_STA_PATTERN {1, 1, 1, 0, 1, 0}
+#define MOUSE_PATTERN {1, 1, 1, 0, 1, 0, 1, 0}
 
 static int wifi_ap = 0;
 static int wifi_sta = -1;
@@ -116,62 +90,6 @@ void state_callback(int state)
         send_state();
     }
 }
-
-// Demo Application
-
-#ifdef HAVE_BTSTACK_STDIN
-
-static const int MOUSE_SPEED = 8;
-
-// On systems with STDIN, we can directly type on the console
-
-static void stdin_process(char character)
-{
-    MOUSE *mouse = MOUSE::get();
-    if (!mouse->is_connectd()) 
-    {
-        printf("Mouse not connected, ignoring '%c'\n", character);
-        return;
-    }
-
-    int8_t dx = 0;
-    int8_t dy = 0;
-    uint8_t buttons = 0;
-
-    switch (character){
-        case 'D':
-            dx -= MOUSE_SPEED;
-            break;
-        case 'B':
-            dy += MOUSE_SPEED;
-            break;
-        case 'C':
-            dx += MOUSE_SPEED;
-            break;
-        case 'A':
-            dy -= MOUSE_SPEED;
-            break;
-        case 'l':
-            buttons |= 1;
-            break;
-        case 'r':
-            buttons |= 2;
-            break;
-        case 'w':
-            WEB::get()->broadcast_websocket("{\"pin\":\"000000\"}");
-            break;
-        default:
-            return;
-    }
-    mouse->action(dx, dy, buttons, 0);
-    if (buttons != 0)
-    {
-        mouse->action(0, 0, 0, 0);
-    }
-}
-
-#endif
-
 
 void mouse_message(const std::string &msg)
 {
@@ -318,27 +236,18 @@ int main(int argc, const char *argv[])
     // Initialize LED
     LED::get()->set_flash(INIT_PATTERN);
 
-    // inform about BTstack state
-    hci_event_callback_registration.callback = &packet_handler;
-    hci_add_event_handler(&hci_event_callback_registration);
-
     printf("mouse\n");
     MOUSE *mouse = MOUSE::get();
     mouse->set_notice_callback(state_callback);
-    mouse->init(nullptr);
     mouse->set_message_callback(mouse_message);
- 
-#ifdef HAVE_BTSTACK_STDIN
-    btstack_stdin_setup(stdin_process);
-#endif
+    mouse->init();
 
     printf("web\n");
     WEB *web = WEB::get();
     web->set_notice_callback(state_callback);
-    web->init();
     web->set_message_callback(web_message);
+    web->init();
 
     printf("webmouse loop\n");
-    btstack_run_loop_execute();
-
+    mouse->run();
 }
