@@ -294,12 +294,29 @@ function process_ws_message(evt)
   try
   {
     let msg = JSON.parse(evt.detail.message);
+    console.log(msg);
     if (Object.hasOwn(msg, 'mouse'))
     {
       if (Number(msg['mouse']) == 0) {led_ &= ~4;} else {led_ |= 4;}
       if (Number(msg['wifi']) == 0) {led_ &= ~2;} else {led_ |= 2;}
       if (Number(msg['ap']) == 0) {led_ &= ~1;} else {led_ |= 1;}
       show_led();
+    }
+    if (Object.hasOwn(msg, 'mute'))
+    {
+      let btn = document.getElementById('mutebtn');
+      if (msg['mute'] == 'true')
+      {
+        btn.style.background = "lightpink";
+      }
+      else
+      {
+        btn.style.background = document.getElementById('left').style.background;
+      }
+    }
+    if (Object.hasOwn(msg, 'pin'))
+    {
+      post_message('pin = ' + msg['pin'], 30);
     }
   }
   catch(e)

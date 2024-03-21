@@ -218,6 +218,7 @@ void web_message(const std::string &msg)
     else if (func == "get_state")
     {
         send_state();
+        MOUSE::get()->send_led_status();
     } 
 }
 

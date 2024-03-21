@@ -48,6 +48,7 @@
 
 #include "mouse.h"
 #include "keycode.h"
+#include "txt.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -66,13 +67,14 @@
 #include "mouse_att.h"
 #include "hci_dump_embedded_stdout.h"
 
-#define MOUSE_REPORT_ID 1
-#define KEYBOARD_REPORT_ID 2
+#define KEYBOARD_REPORT_ID 1
+#define MOUSE_REPORT_ID 2
 #define CONSUMER_REPORT_ID 3
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
-MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(100), message_callback_(nullptr)
+MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(100),
+                 caps_lock_(-1), num_lock_(-1), mute_(-1), message_callback_(nullptr)
 {
 
 }
@@ -101,6 +103,57 @@ bool MOUSE::init()
     // from USB HID Specification 1.1, Appendix B.2
     static uint8_t hid_descriptor_mouse[] =
     {
+        //  Keyboard
+        0x05, 0x01,                    // Usage Page (Generic Desktop)
+        0x09, 0x06,                    // Usage (Keyboard)
+        0xa1, 0x01,                    // Collection (Application)
+
+        0x85,  KEYBOARD_REPORT_ID,     // Report ID
+
+        // Modifier byte
+
+        0x75, 0x01,                    //   Report Size (1)
+        0x95, 0x08,                    //   Report Count (8)
+        0x05, 0x07,                    //   Usage Page (Key codes)
+        0x19, 0xe0,                    //   Usage Minimum (Keyboard LeftControl)
+        0x29, 0xe7,                    //   Usage Maxium (Keyboard Right GUI)
+        0x15, 0x00,                    //   Logical Minimum (0)
+        0x25, 0x01,                    //   Logical Maximum (1)
+        0x81, 0x02,                    //   Input (Data, Variable, Absolute)
+
+        // Reserved byte
+
+        0x75, 0x01,                    //   Report Size (1)
+        0x95, 0x08,                    //   Report Count (8)
+        0x81, 0x03,                    //   Input (Constant, Variable, Absolute)
+
+        // LED report + padding
+
+        0x95, 0x05,                    //   Report Count (6)
+        0x75, 0x01,                    //   Report Size (1)
+        0x05, 0x08,                    //   Usage Page (LEDs)
+        0x19, 0x01,                    //   Usage Minimum (Num Lock)
+        0x29, 0x05,                    //   Usage Maxium (Kana)
+        0x09, 0x09,                    //   Usage (Mute)
+        0x91, 0x02,                    //   Output (Data, Variable, Absolute)
+
+        0x95, 0x01,                    //   Report Count (1)
+        0x75, 0x03,                    //   Report Size (2)
+        0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
+
+        // Keycodes
+
+        0x95, 0x06,                    //   Report Count (6)
+        0x75, 0x08,                    //   Report Size (8)
+        0x15, 0x00,                    //   Logical Minimum (0)
+        0x25, 0xff,                    //   Logical Maximum (ff)
+        0x05, 0x07,                    //   Usage Page (Key codes)
+        0x19, 0x00,                    //   Usage Minimum (Reserved (no event indicated))
+        0x29, 0xff,                    //   Usage Maxium (Reserved)
+        0x81, 0x00,                    //   Input (Data, Array)
+
+        0xc0,                          // End collection
+
         //  Mouse
         0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
         0x09, 0x02,                    // USAGE (Mouse)
@@ -134,56 +187,6 @@ bool MOUSE::init()
 
         0xc0,                          //   END_COLLECTION
         0xc0,                          // END_COLLECTION
-
-        //  Keyboard
-        0x05, 0x01,                    // Usage Page (Generic Desktop)
-        0x09, 0x06,                    // Usage (Keyboard)
-        0xa1, 0x01,                    // Collection (Application)
-
-        0x85,  KEYBOARD_REPORT_ID,     // Report ID
-
-        // Modifier byte
-
-        0x75, 0x01,                    //   Report Size (1)
-        0x95, 0x08,                    //   Report Count (8)
-        0x05, 0x07,                    //   Usage Page (Key codes)
-        0x19, 0xe0,                    //   Usage Minimum (Keyboard LeftControl)
-        0x29, 0xe7,                    //   Usage Maxium (Keyboard Right GUI)
-        0x15, 0x00,                    //   Logical Minimum (0)
-        0x25, 0x01,                    //   Logical Maximum (1)
-        0x81, 0x02,                    //   Input (Data, Variable, Absolute)
-
-        // Reserved byte
-
-        0x75, 0x01,                    //   Report Size (1)
-        0x95, 0x08,                    //   Report Count (8)
-        0x81, 0x03,                    //   Input (Constant, Variable, Absolute)
-
-        // LED report + padding
-
-        0x95, 0x05,                    //   Report Count (5)
-        0x75, 0x01,                    //   Report Size (1)
-        0x05, 0x08,                    //   Usage Page (LEDs)
-        0x19, 0x01,                    //   Usage Minimum (Num Lock)
-        0x29, 0x05,                    //   Usage Maxium (Kana)
-        0x91, 0x02,                    //   Output (Data, Variable, Absolute)
-
-        0x95, 0x01,                    //   Report Count (1)
-        0x75, 0x03,                    //   Report Size (3)
-        0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
-
-        // Keycodes
-
-        0x95, 0x06,                    //   Report Count (6)
-        0x75, 0x08,                    //   Report Size (8)
-        0x15, 0x00,                    //   Logical Minimum (0)
-        0x25, 0xff,                    //   Logical Maximum (ff)
-        0x05, 0x07,                    //   Usage Page (Key codes)
-        0x19, 0x00,                    //   Usage Minimum (Reserved (no event indicated))
-        0x29, 0xff,                    //   Usage Maxium (Reserved)
-        0x81, 0x00,                    //   Input (Data, Array)
-
-        0xc0,                          // End collection
     
         //  Consumer (A/V) control
         0x05, 0x0C,                     // Usage Page (Consumer)
@@ -207,8 +210,10 @@ bool MOUSE::init()
         0xC0,                           // End Collection
     };
 
-    //hci_dump_init(hci_dump_embedded_stdout_get_instance());
-    //att_dump_attributes();
+#if 0
+    hci_dump_init(hci_dump_embedded_stdout_get_instance());
+    att_dump_attributes();
+#endif
     memset(storage_, 0, sizeof(storage_));
     hids_device_init_with_storage(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse), NUM_REPORTS, storage_);
  
@@ -334,6 +339,17 @@ void MOUSE::keystroke(uint8_t ch, uint8_t ctrl, uint8_t alt, uint8_t shift)
         uint8_t modifier;
         if (KEYCODE::get_code_and_modifier(ch, keycode, modifier))
         {
+            //  Reset Caps Lock if set
+            if (caps_lock_ == 1)
+            {
+                caps_lock_ = 0;
+                reports_.emplace_back(REPORT(0x39, 0));
+            }
+            if (num_lock_ == 1)
+            {
+                num_lock_ = 0;
+                reports_.emplace_back(REPORT(0x53, 0));
+            }
             if (ctrl) modifier |= 0x01;
             if (alt) modifier |= 0x04;
             if (shift) modifier |= 0x02;
@@ -392,16 +408,21 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
     UNUSED(packet_size);
     uint16_t conn_interval;
     bd_addr_t local_addr;
-
-    if (packet_type != HCI_EVENT_PACKET) return;
+    uint8_t report_id;
+    uint8_t report_type;
+    uint8_t report_length;
+    const uint8_t *report_data;
 
     MOUSE *mouse = get();
-    switch (hci_event_packet_get_type(packet)) {
+    switch (packet_type)
+    {
+    case HCI_EVENT_PACKET:
+        switch (hci_event_packet_get_type(packet))
+        {
         case HCI_EVENT_DISCONNECTION_COMPLETE:
             mouse->con_handle = HCI_CON_HANDLE_INVALID;
             printf("Disconnected\n");
-            get()->send_web_message("connect", "false");
-            mouse->send_notice(MOUSE_INACTIVE);
+            mouse->set_mouse_state(false);
             break;
         case SM_EVENT_JUST_WORKS_REQUEST:
             printf("Just Works requested\n");
@@ -424,57 +445,65 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             printf("L2CAP Connection Parameter Update Complete, response: %x\n", l2cap_event_connection_parameter_update_response_get_result(packet));
             break;
         case HCI_EVENT_LE_META:
-            switch (hci_event_le_meta_get_subevent_code(packet)) {
-                case HCI_SUBEVENT_LE_CONNECTION_COMPLETE:
-                    // print connection parameters (without using float operations)
-                    conn_interval = hci_subevent_le_connection_complete_get_conn_interval(packet);
-                    printf("LE Connection Complete:\n");
-                    printf("- Connection Interval: %u.%02u ms\n", conn_interval * 125 / 100, 25 * (conn_interval & 3));
-                    printf("- Connection Latency: %u\n", hci_subevent_le_connection_complete_get_conn_latency(packet));
-                    break;
-                case HCI_SUBEVENT_LE_CONNECTION_UPDATE_COMPLETE:
-                    // print connection parameters (without using float operations)
-                    conn_interval = hci_subevent_le_connection_update_complete_get_conn_interval(packet);
-                    printf("LE Connection Update:\n");
-                    printf("- Connection Interval: %u.%02u ms\n", conn_interval * 125 / 100, 25 * (conn_interval & 3));
-                    printf("- Connection Latency: %u\n", hci_subevent_le_connection_update_complete_get_conn_latency(packet));
-                    break;
-                default:
-                    break;
+            switch (hci_event_le_meta_get_subevent_code(packet))
+            {
+            case HCI_SUBEVENT_LE_CONNECTION_COMPLETE:
+                // print connection parameters (without using float operations)
+                conn_interval = hci_subevent_le_connection_complete_get_conn_interval(packet);
+                printf("LE Connection Complete:\n");
+                printf("- Connection Interval: %u.%02u ms\n", conn_interval * 125 / 100, 25 * (conn_interval & 3));
+                printf("- Connection Latency: %u\n", hci_subevent_le_connection_complete_get_conn_latency(packet));
+                break;
+            case HCI_SUBEVENT_LE_CONNECTION_UPDATE_COMPLETE:
+                // print connection parameters (without using float operations)
+                conn_interval = hci_subevent_le_connection_update_complete_get_conn_interval(packet);
+                printf("LE Connection Update:\n");
+                printf("- Connection Interval: %u.%02u ms\n", conn_interval * 125 / 100, 25 * (conn_interval & 3));
+                printf("- Connection Latency: %u\n", hci_subevent_le_connection_update_complete_get_conn_latency(packet));
+                break;
+            default:
+                break;
             }
             break;  
         case HCI_EVENT_HIDS_META:
-            switch (hci_event_hids_meta_get_subevent_code(packet)){
-                case HIDS_SUBEVENT_INPUT_REPORT_ENABLE:
-                    mouse->con_handle = hids_subevent_input_report_enable_get_con_handle(packet);
-                    printf("Report Characteristic Subscribed %u handle %x\n", hids_subevent_input_report_enable_get_enable(packet), mouse->con_handle);
+            switch (hci_event_hids_meta_get_subevent_code(packet))
+            {
+            case HIDS_SUBEVENT_INPUT_REPORT_ENABLE:
+                mouse->con_handle = hids_subevent_input_report_enable_get_con_handle(packet);
+                printf("Report Characteristic Subscribed %u handle %x\n", hids_subevent_input_report_enable_get_enable(packet), mouse->con_handle);
 
-                    // request connection param update via L2CAP following Apple Bluetooth Design Guidelines
-                    // gap_request_connection_parameter_update(con_handle, 12, 12, 4, 100);    // 15 ms, 4, 1s
+                // request connection param update via L2CAP following Apple Bluetooth Design Guidelines
+                // gap_request_connection_parameter_update(con_handle, 12, 12, 4, 100);    // 15 ms, 4, 1s
 
-                    // directly update connection params via HCI following Apple Bluetooth Design Guidelines
-                    // gap_update_connection_parameters(con_handle, 12, 12, 4, 100);    // 60-75 ms, 4, 1s
+                // directly update connection params via HCI following Apple Bluetooth Design Guidelines
+                // gap_update_connection_parameters(con_handle, 12, 12, 4, 100);    // 60-75 ms, 4, 1s
 
-                    mouse->send_web_message("connect", "true");
-                    mouse->send_notice(MOUSE_ACTIVE);
-                    break;
-                case HIDS_SUBEVENT_BOOT_KEYBOARD_INPUT_REPORT_ENABLE:
-                    mouse->con_handle = hids_subevent_boot_keyboard_input_report_enable_get_con_handle(packet);
-                    printf("Boot Keyboard Characteristic Subscribed %u\n", hids_subevent_boot_keyboard_input_report_enable_get_enable(packet));
-                    break;
-                case HIDS_SUBEVENT_BOOT_MOUSE_INPUT_REPORT_ENABLE:
-                    mouse->con_handle = hids_subevent_boot_mouse_input_report_enable_get_con_handle(packet);
-                    printf("Boot Mouse Characteristic Subscribed %u\n", hids_subevent_boot_mouse_input_report_enable_get_enable(packet));
-                    break;
-                case HIDS_SUBEVENT_PROTOCOL_MODE:
-                    mouse->protocol_mode = hids_subevent_protocol_mode_get_protocol_mode(packet);
-                    printf("Protocol Mode: %s mode\n", hids_subevent_protocol_mode_get_protocol_mode(packet) ? "Report" : "Boot");
-                    break;
-                case HIDS_SUBEVENT_CAN_SEND_NOW:
-                    mouse->mousing_can_send_now();
-                    break;
-                default:
-                    break;
+                mouse->set_mouse_state(true);
+                break;
+            case HIDS_SUBEVENT_BOOT_KEYBOARD_INPUT_REPORT_ENABLE:
+                mouse->con_handle = hids_subevent_boot_keyboard_input_report_enable_get_con_handle(packet);
+                printf("Boot Keyboard Characteristic Subscribed %u\n", hids_subevent_boot_keyboard_input_report_enable_get_enable(packet));
+                break;
+            case HIDS_SUBEVENT_BOOT_MOUSE_INPUT_REPORT_ENABLE:
+                mouse->con_handle = hids_subevent_boot_mouse_input_report_enable_get_con_handle(packet);
+                printf("Boot Mouse Characteristic Subscribed %u\n", hids_subevent_boot_mouse_input_report_enable_get_enable(packet));
+                break;
+            case HIDS_SUBEVENT_PROTOCOL_MODE:
+                mouse->protocol_mode = hids_subevent_protocol_mode_get_protocol_mode(packet);
+                printf("Protocol Mode: %s mode\n", hids_subevent_protocol_mode_get_protocol_mode(packet) ? "Report" : "Boot");
+                break;
+            case HIDS_SUBEVENT_CAN_SEND_NOW:
+                mouse->mousing_can_send_now();
+                break;
+            case HIDS_SUBEVENT_SET_REPORT:
+                // SET_REPORT received. Check for keyboard LED report.
+                report_id = hids_subevent_set_report_get_report_id(packet);
+                report_type = hids_subevent_set_report_get_report_type(packet);
+                report_length = hids_subevent_set_report_get_report_length(packet);
+                report_data = hids_subevent_set_report_get_report_data(packet);
+                mouse->process_set_report(report_id, report_type, report_length, report_data);
+            default:
+                break;
             }
             break;
 
@@ -486,6 +515,63 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             
         default:
             break;
+
+        break;
+        }
+
+    default:
+        break;
+    }
+}
+
+void MOUSE::set_mouse_state(bool active)
+{
+    if (active)
+    {
+        send_web_message("connect", "true");
+        send_notice(MOUSE_ACTIVE);
+    }
+    else
+    {
+        send_web_message("connect", "false");
+        send_notice(MOUSE_INACTIVE);
+        caps_lock_ = -1;
+        num_lock_ = -1;
+        mute_ = -1;
+    }
+}
+
+
+void MOUSE::process_set_report(uint8_t report_id, uint8_t report_type, uint8_t report_length, const uint8_t *report_data)
+{
+    if (report_id == KEYBOARD_REPORT_ID && report_type == HID_REPORT_TYPE_OUTPUT && report_length == 1)
+    {
+        if ((*report_data & 0x02) != 0)
+        {
+            caps_lock_ = 1;
+        }
+        else
+        {
+            caps_lock_ = 0;
+        }
+        if ((*report_data & 0x01) != 0)
+        {
+            num_lock_ = 1;
+        }
+        else
+        {
+            num_lock_ = 0;
+        }
+        if ((*report_data & 0x20) != 0)
+        {
+            mute_ = 1;
+        }
+        else
+        {
+            mute_ = 0;
+        }
+        printf("Data: %2.2x Caps lock = %d, Num lock = %d, Mute = %d\n", *report_data, caps_lock_, num_lock_, mute_);
+        send_led_status();
     }
 }
 
@@ -494,6 +580,19 @@ void MOUSE::send_web_message(const std::string &key, const std::string &value)
     if (message_callback_)
     {
         std::string msg = std::string("{\"") + key + std::string("\":\"") + value + std::string("\"}");
+        message_callback_(msg);
+    }
+}
+
+void MOUSE::send_led_status()
+{
+    //  Purpose is to send mute indicator to client.  Remove "false && " if mute indicator works
+    if (false && message_callback_)
+    {
+        std::string msg = std::string("{\"capslock\":\"<capslock>\", \"numlock\":\"<numlock>\",\"mute\":\"<mute>\"}");
+        TXT::substitute(msg, "<capslock>", caps_lock_ == 1 ? "true" : "false");
+        TXT::substitute(msg, "<numlock>", num_lock_ == 1 ? "true" : "false");
+        TXT::substitute(msg, "<mute>", mute_ == 1 ? "true" : "false");
         message_callback_(msg);
     }
 }

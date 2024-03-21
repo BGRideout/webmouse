@@ -16,6 +16,9 @@ private:
     uint8_t protocol_mode;
 
     uint8_t         battery_;
+    int8_t          caps_lock_;
+    int8_t          num_lock_;
+    int8_t          mute_;
 
     class REPORT
     {
@@ -42,14 +45,16 @@ private:
     static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * packet, uint16_t packet_size);
     void mousing_can_send_now(void);
     void send_report(uint16_t report_id, uint8_t *buffer, uint16_t bufsiz);
+    void process_set_report(uint8_t report_id, uint8_t report_type, uint8_t report_length, const uint8_t *report_data);
 
-    hids_device_report_t storage_[7];
+    hids_device_report_t storage_[8];
 #define NUM_REPORTS (sizeof(storage_) / sizeof(storage_[0]))
 
     void (*message_callback_)(const std::string &msg);
     void send_web_message(const std::string &key, const std::string &value);
     void (*notice_callback_)(int state);
     void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
+    void set_mouse_state(bool active);
 
     static MOUSE        *singleton_;            // Singleton mouse instance pointer
 
@@ -70,6 +75,8 @@ public:
     static const int MOUSE_ACTIVE = 201;
     static const int MOUSE_INACTIVE = 202;
     void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
+
+    void send_led_status();
 };
 
 #endif
