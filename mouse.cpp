@@ -207,6 +207,15 @@ bool MOUSE::init()
         0x75, 0x01,                     //     Report Size (1)
         0x95, 0x08,                     //     Report Count (8)
         0x81, 0x02,                     //     Input (Data,Value,Relative,Bit Field)
+
+        // 0x95, 0x01,                    //   Report Count (1)
+        // 0x75, 0x01,                    //   Report Size (1)
+        // 0x09, 0xE2,                    //   Usage (Mute)
+        // 0x91, 0x02,                    //   Output (Data, Variable, Absolute)
+        // 0x95, 0x07,                    //   Report Count (7)
+        // 0x75, 0x01,                    //   Report Size (1)
+        // 0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
+
         0xC0,                           // End Collection
     };
 
@@ -572,6 +581,16 @@ void MOUSE::process_set_report(uint8_t report_id, uint8_t report_type, uint8_t r
         }
         printf("Data: %2.2x Caps lock = %d, Num lock = %d, Mute = %d\n", *report_data, caps_lock_, num_lock_, mute_);
         send_led_status();
+    }
+    else
+    {
+        printf("SET_REPORT id:%d, type:%d, length:%d, data:", report_id, report_type, report_length);
+        int nn = (report_length > 16) ? 16 : report_length;
+        for (int ii = 0;ii < nn; ii++)
+        {
+            printf(" %2.2x", report_data[ii]);
+        }
+        printf("\n");
     }
 }
 
