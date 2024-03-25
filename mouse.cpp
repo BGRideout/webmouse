@@ -70,6 +70,7 @@
 #define KEYBOARD_REPORT_ID 1
 #define MOUSE_REPORT_ID 2
 #define CONSUMER_REPORT_ID 3
+//#define FEEDBACK_REPORT_ID 6
 
 MOUSE *MOUSE::singleton_ = nullptr;
 
@@ -129,16 +130,15 @@ bool MOUSE::init()
 
         // LED report + padding
 
-        0x95, 0x05,                    //   Report Count (6)
+        0x95, 0x05,                    //   Report Count (5)
         0x75, 0x01,                    //   Report Size (1)
         0x05, 0x08,                    //   Usage Page (LEDs)
         0x19, 0x01,                    //   Usage Minimum (Num Lock)
         0x29, 0x05,                    //   Usage Maxium (Kana)
-        0x09, 0x09,                    //   Usage (Mute)
         0x91, 0x02,                    //   Output (Data, Variable, Absolute)
 
         0x95, 0x01,                    //   Report Count (1)
-        0x75, 0x03,                    //   Report Size (2)
+        0x75, 0x03,                    //   Report Size (3)
         0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
 
         // Keycodes
@@ -208,16 +208,29 @@ bool MOUSE::init()
         0x95, 0x08,                     //     Report Count (8)
         0x81, 0x02,                     //     Input (Data,Value,Relative,Bit Field)
 
-        // 0x95, 0x01,                    //   Report Count (1)
-        // 0x75, 0x01,                    //   Report Size (1)
-        // 0x09, 0xE2,                    //   Usage (Mute)
-        // 0x91, 0x02,                    //   Output (Data, Variable, Absolute)
-        // 0x95, 0x07,                    //   Report Count (7)
-        // 0x75, 0x01,                    //   Report Size (1)
-        // 0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
-
         0xC0,                           // End Collection
-    };
+    
+#ifdef FEEDBCK_REPORT_ID
+        //  Feedback report
+        0x05, 0x0B,                     // Usage Page (Telephony)
+        0x09, 0x01,                     // Usage (Headset)
+        0xA1, 0x01,                     // Collection (Application)
+        0x85, FEEDBACK_REPORT_ID,       //     Report Id
+        0x15, 0x00,                     //     Logical minimum (0)
+        0x25, 0x01,                     //     Logical maximum (1)
+
+        0x05, 0x08,                    //   Usage Page (LEDs)
+        0x95, 0x01,                    //   Report Count (1)
+        0x75, 0x01,                    //   Report Size (1)
+        0x09, 0x09,                    //   Usage (Mute)
+        0x91, 0x02,                    //   Output (Data, Variable, Absolute)
+        0x95, 0x01,                    //   Report Count (1)
+        0x75, 0x07,                    //   Report Size (7)
+        0x91, 0x03,                    //   Output (Constant, Variable, Absolute)
+ 
+        0xC0,                           // End Collection
+#endif
+   };
 
 #if 0
     hci_dump_init(hci_dump_embedded_stdout_get_instance());
@@ -225,6 +238,10 @@ bool MOUSE::init()
 #endif
     memset(storage_, 0, sizeof(storage_));
     hids_device_init_with_storage(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse), NUM_REPORTS, storage_);
+    for (int ii = 0; ii < NUM_REPORTS; ii++)
+    {
+        printf("%2d ID:%d Type:%d, Size:%d, Handle:%d\n", ii, storage_[ii].id, storage_[ii].type, storage_[ii].size, storage_[ii].value_handle);
+    }
  
     // setup advertisements
     static uint8_t adv_data[] =

@@ -47,7 +47,7 @@ private:
     void send_report(uint16_t report_id, uint8_t *buffer, uint16_t bufsiz);
     void process_set_report(uint8_t report_id, uint8_t report_type, uint8_t report_length, const uint8_t *report_data);
 
-    hids_device_report_t storage_[8];
+    hids_device_report_t storage_[9];
 #define NUM_REPORTS (sizeof(storage_) / sizeof(storage_[0]))
 
     void (*message_callback_)(const std::string &msg);
