@@ -32,6 +32,9 @@ document.addEventListener('DOMContentLoaded', function()
   let kbd = document.getElementById('kbd');
   kbd.addEventListener('keyup', (e) => {keystroke(e, 'up');});
   kbd.addEventListener('input', (e) => {keystroke(e, 'input');});
+  let kbd2 = document.getElementById('kbd2');
+  kbd2.addEventListener('keyup', (e) => {keystroke(e, 'up');});
+  kbd2.addEventListener('input', (e) => {keystroke(e, 'input');});
 
   let btns = document.querySelectorAll(".extkbd button");
   for (btn of btns)
@@ -57,6 +60,7 @@ document.addEventListener('DOMContentLoaded', function()
   else
   {
     kbd.addEventListener('focus', focused);
+    kbd2.addEventListener('focus', focused);
     // kbd.addEventListener('blur', blurred);
     // let ekbd = document.getElementById('extkbd');
     // ekbd.addEventListener('focusin', focused);
@@ -121,7 +125,11 @@ function keystroke(e, updown)
 function ekbtn(evt)
 {
   let code = Number(evt.srcElement.getAttribute('code'));
-  let kbd = document.getElementById('kbd');
+  let kbd = document.getElementById('kbd2');
+  if (kbd.style.visibility != 'visible')
+  {
+    kbd = document.getElementById('kbd');
+  }
   kbd.focus();
   if (code == -1)
   {
@@ -218,7 +226,7 @@ function window_resized(evt)
   if (w == prevWidth_)
   {
     let chg = window.visualViewport.height - prevHeight_;
-    if (chg > 40)
+    if (chg > 60)
     {
       xktimer = setTimeout(xktimeout, 100);
     }
@@ -251,7 +259,17 @@ function show_ekbd()
   av.style.display = 'none';
   let ekbd = document.getElementById('extkbd');
   ekbd.style.display = "grid";
-  window.scrollTo(0, document.body.scrollHeight);
+  if (window.visualViewport.height < 400)
+  {
+    let kbd2 = document.getElementById('kbd2');
+    kbd2.style.visibility = 'visible';
+    kbd2.focus();
+    ekbd.scrollIntoView({block: "bottom"});
+  }
+  else
+  {
+    window.scrollTo(0, document.body.scrollHeight);
+  }
 }
 
 function hide_ekbd()
@@ -260,6 +278,8 @@ function hide_ekbd()
   ekbd.style.display = 'none';
   let av = document.getElementById('av_control');
   av.style.display = 'grid';
+  let kbd2 = document.getElementById('kbd2');
+  kbd2.style.visibility = 'hidden';
   reset_modifiers();
   window.scrollTo(0, 0);
 }

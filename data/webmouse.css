@@ -3,7 +3,7 @@ body {text-align: center; font-family: sans-serif; width: 100%;
 h1 {margin: 0px 0px 0px 33px;}
 div {width: 100%;}
 div.mouse {display: flex; flex-direction: column;}
-div.mousearea {flex-grow: 1; flex-shrink: 1; height: 70vh; border: 1px solid black; background: radial-gradient(white, lightblue);}
+div.mousearea {flex-grow: 1; flex-shrink: 1; height: calc(100vh - 240px); border: 1px solid black; background: radial-gradient(white, lightblue);}
 div.controls {flex-grow: 0; flex-shrink: 0; margin-bottom: 12px;}
 div.msgarea {height: 80px; vertical-align: top;}
 div.vspace {height: 50px; vertical-align: top;}
@@ -15,6 +15,7 @@ button.l {width: 40%; height:64px;}
 button.r {width: 40%; height:64px;}
 button.blank {background: transparent; border: none;}
 input.kbd {width: 5%; margin: 12px; text-align: center;}
+input.kbd2 {width: 16px; text-align: center; margin: auto; visibility: hidden;}
 .config {display: grid; grid-template-columns: 3fr 3fr 1fr; row-gap: 8px;}
 .config label {width: 100px; display: inline-block; text-align: left;}
 .config input {width: 192px;}
