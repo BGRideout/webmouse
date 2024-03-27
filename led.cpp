@@ -3,12 +3,15 @@
 #include "led.h"
 #include "pico/cyw43_arch.h"
 
+#define FLASH_INTERVAL 150
+
 LED *LED::singleton_ = nullptr;
 
-LED::LED() : on_(false), flash_index_(0), updating_(false)
+LED::LED() : on_(false), flash_index_(0), updating_(false), time_worker_({0})
 {
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
-    add_repeating_timer_ms(150, timer_callback, this, &timer_);
+    time_worker_.do_work = timer_callback;
+    async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &time_worker_, FLASH_INTERVAL);
 }
 
 void LED::set_flash(const std::initializer_list<bool> &pattern)
@@ -67,8 +70,8 @@ void LED::flash()
     }
 }
 
-bool LED::timer_callback(repeating_timer_t *rt)
+void LED::timer_callback(async_context_t *context, async_at_time_worker_t *worker)
 {
+    async_context_add_at_time_worker_in_ms(context, worker, FLASH_INTERVAL);
     get()->flash();
-    return true;
 }

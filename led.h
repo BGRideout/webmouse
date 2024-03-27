@@ -6,7 +6,7 @@
 #include <initializer_list>
 #include <vector>
 
-#include "pico/time.h"
+#include "pico/async_context.h"
 
 class LED
 {
@@ -21,8 +21,8 @@ private:
 
     static LED *singleton_;
 
-    repeating_timer_t timer_;
-    static bool timer_callback(repeating_timer_t *rt);
+    async_at_time_worker_t time_worker_;
+    static void timer_callback(async_context_t *context, async_at_time_worker_t *worker);
 
     LED();
 

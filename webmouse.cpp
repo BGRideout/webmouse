@@ -11,7 +11,7 @@
 
 #include <stdexcept>
 
-#define INIT_PATTERN {0, 0, 0, 0, 0, 1}
+#define INIT_PATTERN {1, 0}
 #define HEADER_PATTERN {1, 1, 1}
 #define WIFI_AP_PATTERN {1, 1, 1, 0}
 #define WIFI_STA_PATTERN {1, 1, 1, 0, 1, 0}
