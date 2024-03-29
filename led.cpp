@@ -9,9 +9,17 @@ LED *LED::singleton_ = nullptr;
 
 LED::LED() : on_(false), flash_index_(0), updating_(false), time_worker_({0})
 {
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
+    set_led(false);
     time_worker_.do_work = timer_callback;
     async_context_add_at_time_worker_in_ms(cyw43_arch_async_context(), &time_worker_, FLASH_INTERVAL);
+}
+
+void LED::set_led(bool on)
+{
+    cyw43_thread_enter();
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, on);
+    cyw43_thread_exit();
+    on_ = on;
 }
 
 void LED::set_flash(const std::initializer_list<bool> &pattern)
@@ -55,8 +63,7 @@ void LED::flash()
         bool on = flash_pattern_.at(flash_index_);
         if (on ^ on_)
         {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, on);
-            on_ = on;
+            set_led(on);
         }
         flash_index_ += 1;
     }
@@ -64,8 +71,7 @@ void LED::flash()
     {
         if (on_)
         {
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, false);
-            on_ = false;
+            set_led(false);
         }
     }
 }

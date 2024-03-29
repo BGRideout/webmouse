@@ -505,6 +505,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
                 // gap_update_connection_parameters(con_handle, 12, 12, 4, 100);    // 60-75 ms, 4, 1s
 
                 mouse->set_mouse_state(true);
+                get()->send_web_message("pin", "");
                 break;
             case HIDS_SUBEVENT_BOOT_KEYBOARD_INPUT_REPORT_ENABLE:
                 mouse->con_handle = hids_subevent_boot_keyboard_input_report_enable_get_con_handle(packet);

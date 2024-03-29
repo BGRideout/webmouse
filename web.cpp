@@ -40,6 +40,10 @@ WEB *WEB::get()
 bool WEB::init()
 {
     cyw43_arch_enable_sta_mode();
+    cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
+    uint32_t pm;
+    cyw43_wifi_get_pm(&cyw43_state, &pm);
+    printf("Power mode: %x\n", pm);
 
     if (!connect_to_wifi())
     {

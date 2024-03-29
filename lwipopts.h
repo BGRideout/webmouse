@@ -78,6 +78,7 @@
 #define LWIP_IGMP                   1
 #define LWIP_NUM_NETIF_CLIENT_DATA  1
 #define MEMP_NUM_UDP_PCB            5
+#define MDNS_DEBUG                  LWIP_DBG_OFF
 
 #define MEMP_NUM_SYS_TIMEOUT   (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 16)
 

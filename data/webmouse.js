@@ -336,7 +336,10 @@ function process_ws_message(evt)
     }
     if (Object.hasOwn(msg, 'pin'))
     {
-      post_message('pin = ' + msg['pin'], 30);
+      if (msg['pin'] != '')
+      {
+        post_message('pin = ' + msg['pin'], 30);
+      }
     }
   }
   catch(e)

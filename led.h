@@ -15,6 +15,7 @@ private:
     std::vector<bool>   flash_pattern_;
     int                 flash_index_;
     void flash();
+    void set_led(bool on);
 
     bool                updating_;
     std::vector<bool>   update_;
