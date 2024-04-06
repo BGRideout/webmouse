@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function()
   document.addEventListener('ws_message', process_ws_message);
   openWS();
 
-  setInterval(checkReport, 100);
+  setInterval(checkReport, 25);
   setInterval(checkConnection, 10000);
 });
 

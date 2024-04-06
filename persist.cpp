@@ -8,6 +8,7 @@
 #include <pico/multicore.h>
 #include <pico/flash.h>
 #include <hardware/watchdog.h>
+#include <pico/btstack_flash_bank.h>
 
 Persist::Persist() : flash_size_(0)
 {
@@ -21,6 +22,11 @@ void Persist::init()
     if (status == PICO_OK && flash_size_ > 0)
     {
         printf("Flash size: %d\n", flash_size_);
+        if ((PICO_FLASH_BANK_STORAGE_OFFSET + PICO_FLASH_BANK_TOTAL_SIZE) / 1024 == flash_size_)
+        {
+            flash_size_ -= PICO_FLASH_BANK_TOTAL_SIZE / 1024;
+            printf("Adjust size for BTStack flash storage to %d\n", flash_size_);
+        }
     }
     else
     {
