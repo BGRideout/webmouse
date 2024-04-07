@@ -30,6 +30,13 @@ void send_state()
     WEB::get()->broadcast_websocket(msg);
 }
 
+void send_title()
+{
+    std::string msg("{\"title\":\"<title>\"}");
+    TXT::substitute(msg, "<title>", CONFIG::get()->title());
+    WEB::get()->broadcast_websocket(msg);
+}
+
 void state_callback(int state)
 {
     bool change = false;
@@ -219,7 +226,11 @@ void web_message(const std::string &msg)
     {
         send_state();
         MOUSE::get()->send_led_status();
-    } 
+    }
+    else if (func == "get_title")
+    {
+        send_title();
+    }
 }
 
 int main(int argc, const char *argv[])

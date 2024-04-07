@@ -13,6 +13,7 @@ private:
         char    hostname[32];
         char    ssid[64];
         char    password[64];
+        char    title[16];
     } cfgdata;
 
     CONFIG();
@@ -26,9 +27,11 @@ public:
     const char *hostname() const { return cfgdata.hostname; }
     const char *ssid() const { return cfgdata.ssid; }
     const char *password() const { return cfgdata.password; }
+    const char *title() const { return cfgdata.title; }
 
     bool set_hostname(const char *hostname);
     bool set_wifi_credentials(const char *ssid, const char *password);
+    bool set_title(const char *title);
 };
 
 #endif

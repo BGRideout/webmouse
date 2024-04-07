@@ -15,10 +15,11 @@ bool CONFIG::read_config()
     int fd = Persist::get()->open("config", O_READ);
     if (fd != -1)
     {
+        strncpy(cfgdata.title, "Web Mouse", sizeof(cfgdata.title));
         nr = Persist::get()->read(fd, (uint8_t *)&cfgdata, sizeof(cfgdata));
         Persist::get()->close(fd);
     }
-    return (nr == sizeof(cfgdata));
+    return (nr >= ((uint8_t *)&cfgdata.title - (uint8_t *)&cfgdata));
 }
 
 bool CONFIG::write_config()
@@ -63,5 +64,11 @@ bool CONFIG::set_wifi_credentials(const char *ssid, const char *password)
 {
     strncpy(cfgdata.ssid, ssid, sizeof(cfgdata.ssid) - 1);
     strncpy(cfgdata.password, password, sizeof(cfgdata.password) - 1);
+    return write_config();
+}
+
+bool CONFIG::set_title(const char *title)
+{
+    strncpy(cfgdata.title, title, sizeof(cfgdata.title) - 1);
     return write_config();
 }

@@ -128,6 +128,8 @@ private:
     void (*notice_callback_)(int state);
     void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
 
+    std::string uri_decode(const std::string &uri) const;
+
 public:
     static WEB *get();
     bool init();

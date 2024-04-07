@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function()
   document.addEventListener('ws_message', process_ws_message);
   document.getElementById('scan').addEventListener('click', scan_wifi);
   document.getElementById('update').addEventListener('click', config_update);
+  document.getElementById('title_update').addEventListener('click', config_update);
   document.getElementById('ssids').addEventListener('change', ssid_select);
   openWS();
   setInterval(checkConnection, 10000);
@@ -18,6 +19,7 @@ function ws_state_change(evt)
   {
     sendToWS('func=get_state');
     sendToWS('func=get_wifi');
+    sendToWS('func=get_title');
     led_ &= ~8;
   }
   else
@@ -54,7 +56,11 @@ function process_ws_message(evt)
       if (Number(msg['ap']) == 0) {led_ &= ~1;} else {led_ |= 1;}
       show_led();
     }
-  }
+    if (Object.hasOwn(msg, 'title'))
+    {
+      document.getElementById('title').value = msg['title'];
+    }
+}
   catch(e)
   {
     console.log(e);
@@ -73,9 +79,10 @@ function config_update()
   document.getElementById('ip').innerHTML = '';
   let cmd = 'func=config_update';
   let inps = document.querySelectorAll('input');
-  for (inp of inps)
+  for (let inp of inps)
   {
-    cmd += ' ' + inp.name + '=' + inp.value;
+    cmd += ' ' + inp.name + '=' + encodeURI(inp.value);
+    console.log(cmd);
   }
   sendToWS(cmd);
 }

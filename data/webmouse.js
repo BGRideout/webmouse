@@ -299,6 +299,7 @@ function ws_state_change(evt)
 {
   if (evt.detail.obj['open'])
   {
+    sendToWS('func=get_title');
     sendToWS('func=get_state');
     led_ &= ~8;
   }
@@ -340,6 +341,11 @@ function process_ws_message(evt)
       {
         post_message('pin = ' + msg['pin'], 30);
       }
+    }
+    if (Object.hasOwn(msg, 'title'))
+    {
+      let h1 = document.getElementById('title');
+      h1.innerHTML = msg['title'];
     }
   }
   catch(e)

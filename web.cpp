@@ -629,6 +629,7 @@ void WEB::update_wifi(const std::string &cmd)
     std::string hostname;
     std::string ssid;
     std::string password = cfg->password();
+    std::string title = cfg->title();
 
     std::vector<std::string> items;
     TXT::split(cmd, " ", items);
@@ -640,7 +641,7 @@ void WEB::update_wifi(const std::string &cmd)
         std::string value = "";
         if (item.size() > 1)
         {
-            value = item.at(1);
+            value = uri_decode(item.at(1));
         }
         if (name == "hostname")
         {
@@ -654,22 +655,36 @@ void WEB::update_wifi(const std::string &cmd)
         {
             password = value;
         }
+        else if (name == "title")
+        {
+            title = value;
+        }
     }
 
-    printf("Update: host=%s, ssid=%s, pw=%s\n", hostname.c_str(), ssid.c_str(), password.c_str());
+    printf("Update: host=%s, ssid=%s, pw=%s, title='%s'\n", hostname.c_str(), ssid.c_str(), password.c_str(), title.c_str());
 
+    bool wifi_change = false;
     if (hostname != cfg->hostname())
     {
         cfg->set_hostname(hostname.c_str());
+        wifi_change = true;
     }
     if (ssid != cfg->ssid() || password != cfg->password())
     {
         cfg->set_wifi_credentials(ssid.c_str(), password.c_str());
+        wifi_change = true;
+    }
+    if (title != cfg->title())
+    {
+        cfg->set_title(title.c_str());
     }
 
     //  Restart the STA WiFi
-    cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
-    connect_to_wifi();
+    if (wifi_change)
+    {
+        cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);
+        connect_to_wifi();
+    }
 }
 
 void WEB::scan_wifi(struct altcp_pcb *client_pcb)
@@ -777,6 +792,25 @@ void WEB::stop_ap()
     cyw43_arch_disable_ap_mode();
     printf("AP deactivated\n");
     send_notice(AP_INACTIVE);
+}
+
+std::string WEB::uri_decode(const std::string &uri) const
+{
+    std::string ret;
+    char ch;
+    int i, ii;
+    for (i=0; i<uri.length(); i++)
+    {
+        if (uri[i]=='%') {
+            sscanf(uri.substr(i+1,2).c_str(), "%x", &ii);
+            ch=static_cast<char>(ii);
+            ret+=ch;
+            i=i+2;
+        } else {
+            ret+=uri[i];
+        }
+    }
+    return (ret);
 }
 
 
