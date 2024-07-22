@@ -104,12 +104,13 @@ function t_move(e)
 
 function keystroke(e, updown)
 {
+  console.log(e);
   if (updown !== 'input')
   {
     let cod = e.which;
     if (e.which == 229 && c_.length > 0)
     {
-      cod = c_.charCodeAt(0)
+      cod = c_.charCodeAt(c_.length - 1)
     }
     let txt = 'func=keyboard c=' + cod + ' ctrl=' + ctrl_ + ' alt=' + alt_;
     sendToWS(txt);
