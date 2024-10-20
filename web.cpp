@@ -74,11 +74,11 @@ bool WEB::init()
     mbedtls_debug_set_threshold(1);
 
     altcp_allocator_t alloc = {altcp_tls_alloc, conf};
-    #else
+#else
     u16_t port = LWIP_IANA_PORT_HTTP;
     struct altcp_tls_config * conf = nullptr;
     altcp_allocator_t alloc = {altcp_tcp_alloc, conf};
-    #endif
+#endif
 
     struct altcp_pcb *pcb = altcp_new_ip_type(&alloc, IPADDR_TYPE_ANY);
 

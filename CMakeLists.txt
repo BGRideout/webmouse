@@ -16,6 +16,9 @@ include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# Add the utility libraries
+add_subdirectory(../picolibs picolibs)
+
 if (${USE-HTTPS} STREQUAL "true")
 	message("Building https version")
 	add_definitions(-DUSE_HTTPS)
@@ -30,11 +33,10 @@ project(webmouse C CXX ASM)
 add_executable(${PROJECT_NAME} webmouse.cpp
  	mouse.cpp web.cpp config.cpp
 	ws.cpp txt.cpp keycode.cpp persist.cpp led.cpp
-	dhcpserver/dhcpserver.c	${CMAKE_CURRENT_BINARY_DIR}/generated/web_files.cpp
+	${CMAKE_CURRENT_BINARY_DIR}/generated/web_files.cpp
 	)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/dhcpserver)
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/build/generated)
 
 #add_compile_definitions(CYW43_LWIP=0)
@@ -44,6 +46,9 @@ pico_set_program_version(${PROJECT_NAME} "0.1")
 
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
+
+# Link the utility libraries
+target_link_libraries(${PROJECT_NAME} PUBLIC bgr_network)
 
 # Add the libraries to the build
 target_link_libraries(${PROJECT_NAME} PUBLIC pico_stdlib pico_btstack_ble pico_btstack_cyw43 pico_cyw43_arch_lwip_threadsafe_background
