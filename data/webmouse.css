@@ -1,5 +1,6 @@
 body {text-align: center; font-family: sans-serif; width: 100%;
-      max-width: 350px; height: 100%; margin: auto; background: lightblue;}
+      max-width: 350px; height: 100%; margin: auto; background: lightblue;
+      user-select: none;}
 h1 {margin: 0px 0px 0px 33px;}
 div {width: 100%;}
 div.mouse {display: flex; flex-direction: column;}
@@ -8,12 +9,12 @@ div.controls {flex-grow: 0; flex-shrink: 0; margin-bottom: 12px;}
 div.msgarea {height: 80px; vertical-align: top;}
 div.vspace {height: 50px; vertical-align: top;}
 div.extkbd {display: None; grid-template-columns: repeat(5, 1fr); row-gap: 4px; column-gap: 4px;}
-.extkbd button {height: 32px;}
+.extkbd button {height: 32px; user-select: none;}
 div.av_control {display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; column-gap: 4px; margin-bottom: 12px;}
-.av_control button {height: 32px;}
-button.l {width: 40%; height:64px;}
-button.r {width: 40%; height:64px;}
-button.blank {background: transparent; border: none;}
+.av_control button {height: 32px; user-select: none;}
+button.l {width: 40%; height:64px; user-select: none;}
+button.r {width: 40%; height:64px; user-select: none;}
+button.blank {background: transparent; border: none; user-select: none;}
 input.kbd {width: 5%; margin: 12px; text-align: center;}
 input.kbd2 {width: 16px; text-align: center; margin: auto; visibility: hidden;}
 .config {display: grid; grid-template-columns: 3fr 3fr 1fr; row-gap: 8px;}
