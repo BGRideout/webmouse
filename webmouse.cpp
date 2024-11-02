@@ -28,12 +28,6 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     led_->setFlashPeriod(INIT_PATTERN.count * bit_time_);
     led_->setFlashPattern(INIT_PATTERN.pattern, INIT_PATTERN.count);
 
-    printf("mouse\n");
-    MOUSE *mouse = MOUSE::get();
-    mouse->set_notice_callback(state_callback, this);
-    mouse->set_message_callback(mouse_message, this);
-    mouse->init();
-
     printf("web\n");
     WEB *web = WEB::get();
     web->setLogger(log_);
@@ -41,6 +35,12 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     web->set_http_callback(http_request, this);
     web->set_message_callback(web_message, this);
     web->init();
+
+    printf("mouse\n");
+    MOUSE *mouse = MOUSE::get();
+    mouse->set_notice_callback(state_callback, this);
+    mouse->set_message_callback(mouse_message, this);
+    mouse->init();
 }
 
 void WEBMOUSE::run()
