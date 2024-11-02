@@ -75,7 +75,9 @@
 MOUSE *MOUSE::singleton_ = nullptr;
 
 MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(100),
-                 caps_lock_(-1), num_lock_(-1), mute_(-1), message_callback_(nullptr)
+                 caps_lock_(-1), num_lock_(-1), mute_(-1),
+                 message_callback_(nullptr), message_user_data_(nullptr),
+                 notice_callback_(nullptr), notice_user_data_(nullptr)
 {
 
 }
@@ -617,7 +619,7 @@ void MOUSE::send_web_message(const std::string &key, const std::string &value)
     if (message_callback_)
     {
         std::string msg = std::string("{\"") + key + std::string("\":\"") + value + std::string("\"}");
-        message_callback_(msg);
+        message_callback_(msg, message_user_data_);
     }
 }
 
@@ -630,7 +632,7 @@ void MOUSE::send_led_status()
         TXT::substitute(msg, "<capslock>", caps_lock_ == 1 ? "true" : "false");
         TXT::substitute(msg, "<numlock>", num_lock_ == 1 ? "true" : "false");
         TXT::substitute(msg, "<mute>", mute_ == 1 ? "true" : "false");
-        message_callback_(msg);
+        message_callback_(msg, message_user_data_);
     }
 }
 

@@ -3,41 +3,104 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 
+#include "webmouse.h"
 #include "mouse.h"
 #include "web.h"
+#include "web_files.h"
+#include "button.h"
+#include "led.h"
 #include "txt.h"
 #include "config.h"
-#include "led.h"
 
 #include <stdexcept>
 
-#define INIT_PATTERN {1, 0}
-#define HEADER_PATTERN {1, 1, 1}
-#define WIFI_AP_PATTERN {1, 1, 1, 0}
-#define WIFI_STA_PATTERN {1, 1, 1, 0, 1, 0}
-#define MOUSE_PATTERN {1, 1, 1, 0, 1, 0, 1, 0}
 
-static int wifi_ap = 0;
-static int wifi_sta = -1;
-static int ble = -1;
+WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
+{
+    log_ = new Logger();
+    log_->setDebug(0);
 
-void send_state()
+    apbtn_ = new Button(0, 3);
+    apbtn_->setEventCallback(button_event, this);
+
+    // Initialize LED
+    led_ = new LED();
+    led_->setFlashPeriod(INIT_PATTERN.count * bit_time_);
+    led_->setFlashPattern(INIT_PATTERN.pattern, INIT_PATTERN.count);
+
+    printf("mouse\n");
+    MOUSE *mouse = MOUSE::get();
+    mouse->set_notice_callback(state_callback, this);
+    mouse->set_message_callback(mouse_message, this);
+    mouse->init();
+
+    printf("web\n");
+    WEB *web = WEB::get();
+    web->setLogger(log_);
+    web->set_notice_callback(state_callback, this);
+    web->set_http_callback(http_request, this);
+    web->set_message_callback(web_message, this);
+    web->init();
+}
+
+void WEBMOUSE::run()
+{
+    CONFIG *cfg = CONFIG::get();
+    WEB *web = WEB::get();
+    if (strlen(cfg->ssid()) > 0)
+    {
+        web->connect_to_wifi(cfg->hostname(), cfg->ssid(), cfg->password());
+    }
+
+    MOUSE::get()->run();
+}
+
+void WEBMOUSE::send_state(ClientHandle client)
 {
     std::string msg("{\"ap\":\"<wifi_ap>\", \"wifi\":\"<wifi_sta>\", \"mouse\":\"<ble>\"}");
     TXT::substitute(msg, "<wifi_ap>", std::to_string(wifi_ap));
     TXT::substitute(msg, "<wifi_sta>", std::to_string(wifi_sta));
     TXT::substitute(msg, "<ble>", std::to_string(ble));
-    WEB::get()->broadcast_websocket(msg);
+    if (client != 0)
+    {
+        WEB::get()->send_message(client, msg);
+    }
+    else
+    {
+        WEB::get()->broadcast_websocket(msg);
+    }
 }
 
-void send_title()
+void WEBMOUSE::send_title(ClientHandle client)
 {
     std::string msg("{\"title\":\"<title>\"}");
     TXT::substitute(msg, "<title>", CONFIG::get()->title());
-    WEB::get()->broadcast_websocket(msg);
+    if (client != 0)
+    {
+        WEB::get()->send_message(client, msg);
+    }
+    else
+    {
+        WEB::get()->broadcast_websocket(msg);
+    }
 }
 
-void state_callback(int state)
+void WEBMOUSE::send_wifi(ClientHandle client)
+{
+    WEB *web = WEB::get();
+    std::string msg = "{\"func\": \"wifi_resp\", \"host\": \"" + web->hostname() +
+              "\", \"ssid\": \"" + web->wifi_ssid() + "\", \"ip\": \"" + web->ip_addr() + "\"}";
+    if (client != 0)
+    {
+        WEB::get()->send_message(client, msg);
+    }
+    else
+    {
+        WEB::get()->broadcast_websocket(msg);
+    }
+}
+
+void WEBMOUSE::state_callback(int state)
 {
     bool change = false;
     int newval;
@@ -86,24 +149,73 @@ void state_callback(int state)
 
     if (change)
     {
-        LED *led = LED::get();
-        led->begin_pattern_update();
-        led->add_to_pattern(HEADER_PATTERN);
-        if (wifi_ap) led->add_to_pattern(WIFI_AP_PATTERN);
-        if (wifi_sta) led->add_to_pattern(WIFI_STA_PATTERN);
-        if (ble) led->add_to_pattern(MOUSE_PATTERN);
-        led->end_pattern_update();
+        uint32_t    count = HEADER_PATTERN.count;
+        uint32_t    pattern = HEADER_PATTERN.pattern;
+        if (wifi_ap)
+        {
+            pattern |= WIFI_AP_PATTERN.pattern << count;
+            count += WIFI_AP_PATTERN.count;
+        }
+        if (wifi_sta)
+        {
+            pattern |= WIFI_STA_PATTERN.pattern << count;
+            count += WIFI_STA_PATTERN.count;
+        }
+        if (ble)
+        {
+            pattern |= MOUSE_PATTERN.pattern << count;
+            count += MOUSE_PATTERN.count;
+        }
+        led_->setFlashPeriod(count * bit_time_);
+        led_->setFlashPattern(pattern, count);
         printf("LED pattern %d %d %d\n", wifi_ap, wifi_sta, ble);
         send_state();
     }
 }
 
-void mouse_message(const std::string &msg)
+void WEBMOUSE::mouse_message(const std::string &msg)
 {
     WEB::get()->broadcast_websocket(msg);
 }
 
-void web_message(const std::string &msg)
+bool WEBMOUSE::http_request(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close)
+{
+    bool ret = false;
+
+    log_->print_debug(1, "%d HTTP %s %s\n", client, rqst.type().c_str(), rqst.url().c_str());
+    if (rqst.type() == "GET")
+    {
+        ret = http_get(web, client, rqst, close);
+    }
+    else if (rqst.type() == "POST")
+    {
+        ret = http_post(web, client, rqst, close);
+    }
+    return ret;
+}
+
+bool WEBMOUSE::http_get(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close)
+{
+    bool ret = false;
+    std::string url = rqst.path();
+    if (url == "/" || url.empty()) url = "/index.html";
+    const char *data;
+    u16_t datalen;
+    if (url.length() > 0 && WEB_FILES::get()->get_file(url.substr(1), data, datalen))
+    {
+        web->send_data(client, data, datalen, WEB::STAT);
+        close = false;
+        ret = true;
+    }
+    return ret;
+}
+
+bool WEBMOUSE::http_post(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close)
+{
+    return false;
+}
+
+void WEBMOUSE::web_message(WEB *web, ClientHandle client, const std::string &msg)
 {
     std::string func;
     std::string code;
@@ -118,6 +230,12 @@ void web_message(const std::string &msg)
     uint8_t alt = 0;
     uint8_t shift = 0;
 
+    std::string hostname;
+    std::string ssid;
+    std::string pwd;
+    std::string title;
+
+    log_->print_debug(1, "%d WS %s\n", client, msg.c_str());
     std::vector<std::string> tok;
     TXT::split(msg, " ", tok);
     for (auto it = tok.cbegin(); it != tok.cend(); ++it)
@@ -208,6 +326,25 @@ void web_message(const std::string &msg)
                 code = val.at(1);
             }
         }
+        else if (func == "config_update")
+        {
+            if (name == "hostname")
+            {
+                hostname = HTTPRequest::uri_decode(val.at(1));
+            }
+            else if (name == "ssid")
+            {
+                ssid = HTTPRequest::uri_decode(val.at(1));
+            }
+            else if (name == "pwd")
+            {
+                pwd = HTTPRequest::uri_decode(val.at(1));
+            }
+            else if (name == "title")
+            {
+                title = HTTPRequest::uri_decode(val.at(1));
+            }
+        }
     }
 
     if (func == "mouse")
@@ -224,12 +361,68 @@ void web_message(const std::string &msg)
     }
     else if (func == "get_state")
     {
-        send_state();
+        send_state(client);
         MOUSE::get()->send_led_status();
     }
     else if (func == "get_title")
     {
-        send_title();
+        send_title(client);
+    }
+    else if (func == "get_wifi")
+    {
+        send_wifi(client);
+    }
+    else if (func == "scan_wifi")
+    {
+        WEB::get()->scan_wifi(client, scan_complete, this);
+    }
+    else if (func == "config_update")
+    {
+        bool change = false;
+        CONFIG *cfg = CONFIG::get();
+        if (cfg->hostname() != hostname)
+        {
+            cfg->set_hostname(hostname.c_str());
+            change = true;
+        }
+        if (pwd.empty()) pwd = cfg->password();
+        if (cfg->ssid() != ssid || cfg->password() != pwd)
+        {
+            cfg->set_wifi_credentials(ssid.c_str(), pwd.c_str());
+            change = true;
+        }
+        if (cfg->title() != title)
+        {
+            cfg->set_title(title.c_str());
+            send_title();
+        }
+        if (change && !ssid.empty())
+        {
+            WEB::get()->update_wifi(hostname, ssid, pwd);
+        }
+    }
+}
+
+bool WEBMOUSE::scan_complete(WEB *web, ClientHandle client, const WiFiScanData &data)
+{
+    std::string resp("{\"ssids\":\"<option>-- Choose WiFi --</option>");
+    for (auto it = data.cbegin(); it != data.cend(); ++it)
+    {
+        if (!it->first.empty())
+        {
+            resp += "<option>" + it->first + "</option>";
+        }
+    }
+    resp += "\"}";
+    return web->send_message(client, resp.c_str());
+}
+
+void WEBMOUSE::button_event(struct Button::ButtonEvent &ev, void *user_data)
+{
+    if (ev.action == Button::Button_Clicked)
+    {
+        static_cast<WEBMOUSE *>(user_data)->log_->print("Start WiFi AP for 30 minutes\n");
+        WEB::get()->enable_ap(30, "webmouse");
     }
 }
 
@@ -245,21 +438,8 @@ int main(int argc, const char *argv[])
         return -1;
     }
 
-    // Initialize LED
-    LED::get()->set_flash(INIT_PATTERN);
-
-    printf("mouse\n");
-    MOUSE *mouse = MOUSE::get();
-    mouse->set_notice_callback(state_callback);
-    mouse->set_message_callback(mouse_message);
-    mouse->init();
-
-    printf("web\n");
-    WEB *web = WEB::get();
-    web->set_notice_callback(state_callback);
-    web->set_message_callback(web_message);
-    web->init();
+    WEBMOUSE *webmouse = new WEBMOUSE();
 
     printf("webmouse loop\n");
-    mouse->run();
+    webmouse->run();
 }

@@ -50,10 +50,12 @@ private:
     hids_device_report_t storage_[9];
 #define NUM_REPORTS (sizeof(storage_) / sizeof(storage_[0]))
 
-    void (*message_callback_)(const std::string &msg);
+    void (*message_callback_)(const std::string &msg, void *user_data);
+    void *message_user_data_;
     void send_web_message(const std::string &key, const std::string &value);
-    void (*notice_callback_)(int state);
-    void send_notice(int state) {if (notice_callback_) notice_callback_(state);}
+    void (*notice_callback_)(int state, void *user_data);
+    void *notice_user_data_;
+    void send_notice(int state) {if (notice_callback_) notice_callback_(state, notice_user_data_);}
     void set_mouse_state(bool active);
 
     static MOUSE        *singleton_;            // Singleton mouse instance pointer
@@ -70,11 +72,13 @@ public:
     void keystroke(uint8_t ch, uint8_t ctrl, uint8_t alt, uint8_t shift);
     void av_control(const std::string &control);
 
-    void set_message_callback(void(*cb)(const std::string &msg)) { message_callback_ = cb; }
+    void set_message_callback(void(*cb)(const std::string &msg, void *user_data), void *user_data=nullptr)
+                             { message_callback_ = cb; message_user_data_ = user_data; }
 
     static const int MOUSE_ACTIVE = 201;
     static const int MOUSE_INACTIVE = 202;
-    void set_notice_callback(void(*cb)(int state)) { notice_callback_ = cb;}
+    void set_notice_callback(void(*cb)(int state, void *user_data), void *user_data=nullptr)
+                            { notice_callback_ = cb; notice_user_data_ = user_data; }
 
     void send_led_status();
 };
