@@ -7,18 +7,22 @@
 #define LWIP_SOCKET                 0
 #define MEM_LIBC_MALLOC             0
 #define MEM_ALIGNMENT               4
-#define MEM_SIZE                    16384
-#define MEMP_NUM_TCP_SEG            96
+#define MEM_SIZE                    10240
+#define MEMP_NUM_TCP_SEG            64
 #define MEMP_NUM_ARP_QUEUE          10
-#define PBUF_POOL_SIZE              24
+#define PBUF_POOL_SIZE              16
 #define LWIP_ARP                    1
 #define LWIP_ETHERNET               1
 #define LWIP_ICMP                   1
 #define LWIP_RAW                    1
 #define TCP_MSS                     1460
-#define TCP_WND                     (16 * TCP_MSS)
-#define TCP_SND_BUF                 (16 * TCP_MSS)
-#define TCP_SND_QUEUELEN            ((6 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
+#ifdef USE_HTTPS
+#define TCP_WND                     16384
+#else
+#define TCP_WND                     (8 * TCP_MSS)
+#endif
+#define TCP_SND_BUF                 (8 * TCP_MSS)
+#define TCP_SND_QUEUELEN            ((4 * (TCP_SND_BUF) + (TCP_MSS - 1)) / (TCP_MSS))
 #define LWIP_NETIF_STATUS_CALLBACK  1
 #define LWIP_NETIF_LINK_CALLBACK    1
 #define LWIP_NETIF_HOSTNAME         1
@@ -84,10 +88,12 @@
 
 //  For TLS
 #define LWIP_ALTCP                  1
+#ifdef USE_HTTPS
 #define LWIP_ALTCP_TLS              1
 #define LWIP_ALTCP_TLS_MBEDTLS      1
 #define MEMP_NUM_TCP_PCB            8
 #define ALTCP_MBEDTLS_DEBUG         LWIP_DBG_ON
 #define ALTCP_MBEDTLS_LIB_DEBUG     LWIP_DBG_ON
+#endif
 
 #endif /* __LWIPOPTS_H__ */

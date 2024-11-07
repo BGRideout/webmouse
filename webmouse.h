@@ -67,6 +67,8 @@ private:
     
     static void button_event(struct Button::ButtonEvent &ev, void *user_data);
 
+    static void tls_callback(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass);
+
 public:
     WEBMOUSE();
 

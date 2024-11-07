@@ -50,12 +50,12 @@ document.addEventListener('DOMContentLoaded', function()
     btn.addEventListener('pointerup', avbtnup);
   }
 
-  if ('virtualKeyboard' in navigator)
+  if ('virtualKeyboard' in navigator && false)
   {
     let ma = document.getElementById('mousearea');
     navigator.virtualKeyboard.overlaysContent = true;
     navigator.virtualKeyboard.addEventListener('geometrychange', kbdshow);
-    post_message('Virtual keyboard API exists');
+    console.log('Virtual keyboard API exists');
   }
   else
   {

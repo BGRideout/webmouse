@@ -34,6 +34,7 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     web->set_notice_callback(state_callback, this);
     web->set_http_callback(http_request, this);
     web->set_message_callback(web_message, this);
+    web->set_tls_callback(tls_callback);
     web->init();
 
     printf("mouse\n");
@@ -41,6 +42,19 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     mouse->set_notice_callback(state_callback, this);
     mouse->set_message_callback(mouse_message, this);
     mouse->init();
+}
+
+void WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass)
+{
+#ifdef USE_HTTPS
+    const char *data;
+    uint16_t    datalen;
+    WEB_FILES::get()->get_file("newcert.pem", data, datalen);
+    cert.append(data, datalen);
+    WEB_FILES::get()->get_file("newkey.pem", data, datalen);
+    pkey.append(data, datalen);
+    pkpass = "webmouse";
+#endif
 }
 
 void WEBMOUSE::run()
