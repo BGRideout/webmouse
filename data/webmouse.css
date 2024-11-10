@@ -2,12 +2,13 @@ body {text-align: center; font-family: sans-serif; width: 100%;
       max-width: 350px; height: 100%; margin: auto; background: lightblue;
       user-select: none;}
 h1 {margin: 0px 0px 0px 33px;}
+h2 {text-align: left;}
 div {width: 100%;}
 div.mouse {display: flex; flex-direction: column;}
 div.mousearea {flex-grow: 1; flex-shrink: 1; height: calc(100vh - 240px); border: 1px solid black; background: radial-gradient(white, lightblue);}
 div.controls {flex-grow: 0; flex-shrink: 0; margin-bottom: 12px;}
 div.msgarea {height: 80px; vertical-align: top;}
-div.vspace {height: 50px; vertical-align: top;}
+div.vspace {height: 35px; vertical-align: top;}
 div.extkbd {display: None; grid-template-columns: repeat(5, 1fr); row-gap: 4px; column-gap: 4px;}
 .extkbd button {height: 32px; user-select: none;}
 div.av_control {display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; column-gap: 4px; margin-bottom: 12px;}
@@ -21,6 +22,8 @@ input.kbd2 {width: 16px; text-align: center; margin: auto; visibility: hidden;}
 .config label {width: 100px; display: inline-block; text-align: left;}
 .config input {width: 192px;}
 .config select {width: 200px;}
+.certs {display: grid; grid-template-columns: 3fr 4fr; row-gap: 8px; visibility: hidden;}
+.certs label {width: 100px; display: inline-block; text-align: left;}
 span.led {float: right; margin-right: 8px; margin-top: 8px; width: 25px; height: 25px; z-index: 10;}
 svg {pointer-events: none;}
 

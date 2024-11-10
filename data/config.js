@@ -6,8 +6,6 @@ document.addEventListener('DOMContentLoaded', function()
   document.addEventListener('ws_state', ws_state_change);
   document.addEventListener('ws_message', process_ws_message);
   document.getElementById('scan').addEventListener('click', scan_wifi);
-  document.getElementById('update').addEventListener('click', config_update);
-  document.getElementById('title_update').addEventListener('click', config_update);
   document.getElementById('ssids').addEventListener('change', ssid_select);
   openWS();
   setInterval(checkConnection, 10000);
@@ -43,6 +41,10 @@ function process_ws_message(evt)
     if (Object.hasOwn(msg, 'ssids'))
     {
       document.getElementById('ssids').innerHTML = msg['ssids'];
+    }
+    if (Object.hasOwn(msg, 'https_ena') && msg['https_ena'] == "true")
+    {
+      document.getElementById('certs').style.visibility = 'visible';
     }
     if (Object.hasOwn(msg, 'pin'))
     {

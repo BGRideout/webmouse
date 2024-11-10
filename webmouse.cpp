@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
+#include <pfs.h>
+#include <lfs.h>
 
 #include "webmouse.h"
 #include "mouse.h"
@@ -14,6 +16,18 @@
 
 #include <stdexcept>
 
+
+//  File system definition
+#define ROOT_OFFSET 0x110000
+#ifndef PICO_FLASH_BANK_TOTAL_SIZE
+#define ROOT_SIZE   (PICO_FLASH_SIZE_BYTES - ROOT_OFFSET)
+#else
+#define ROOT_SIZE   (PICO_FLASH_SIZE_BYTES - ROOT_OFFSET - PICO_FLASH_BANK_TOTAL_SIZE)       // Leave 8K for bluetooth
+#endif
+
+#define CERTFILENAME    "cert.pem"
+#define KEYFILENAME     "key.pem"
+#define PASSFILENAME    "pass.txt"
 
 WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
 {
@@ -47,13 +61,52 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
 void WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass)
 {
 #ifdef USE_HTTPS
-    const char *data;
-    uint16_t    datalen;
-    WEB_FILES::get()->get_file("newcert.pem", data, datalen);
-    cert.append(data, datalen);
-    WEB_FILES::get()->get_file("newkey.pem", data, datalen);
-    pkey.append(data, datalen);
-    pkpass = "webmouse";
+    char    line[128];
+
+    cert.clear();
+    FILE *fd = fopen(CERTFILENAME, "r");
+    if (fd)
+    {
+        while (fgets(line,sizeof(line), fd))
+        {
+            cert += line;
+        }
+        fclose(fd);
+    }
+    else
+    {
+        printf("Failed to open certificate file\n");
+    }
+
+    pkey.clear();
+    fd = fopen(KEYFILENAME, "r");
+    if (fd)
+    {
+        while (fgets(line,sizeof(line), fd))
+        {
+            pkey += line;
+        }
+        fclose(fd);
+    }
+    else
+    {
+        printf("Failed to open private key file\n");
+    }
+
+    pkpass.clear();
+    fd = fopen(PASSFILENAME, "r");
+    if (fd)
+    {
+        if (fgets(line,sizeof(line), fd))
+        {
+            pkpass += line;
+        }
+        fclose(fd);
+    }
+    else
+    {
+        printf("Failed to open passphrase file\n");
+    }
 #endif
 }
 
@@ -103,7 +156,15 @@ void WEBMOUSE::send_wifi(ClientHandle client)
 {
     WEB *web = WEB::get();
     std::string msg = "{\"func\": \"wifi_resp\", \"host\": \"" + web->hostname() +
-              "\", \"ssid\": \"" + web->wifi_ssid() + "\", \"ip\": \"" + web->ip_addr() + "\"}";
+              "\", \"ssid\": \"" + web->wifi_ssid() + "\", \"ip\": \"" + web->ip_addr() +
+              "\", \"http\": \"" + std::string(web->is_http_listening() ? "true" : "false") +
+              "\", \"https\": \"" + std::string(web->is_https_listening() ? "true" : "false") +
+#ifdef USE_HTTPS
+              "\", \"https_ena\": \"true\"" + 
+#else
+              "\", \"https_ena\": \"false\"" + 
+#endif
+              "}";
     if (client != 0)
     {
         WEB::get()->send_message(client, msg);
@@ -136,13 +197,27 @@ void WEBMOUSE::state_callback(int state)
     case WEB::AP_ACTIVE:
         newval = 1;
         change = newval != wifi_ap;
-        if (change) wifi_ap = newval;
+        if (change)
+        {
+            wifi_ap = newval;
+            WEB::get()->start_http();
+            log_->print("AP enabled http. HTTP: %s, HTTPS: %s\n",
+                        WEB::get()->is_http_listening() ? "Y" : "N", WEB::get()->is_https_listening() ? "Y" : "N");
+        }
         break;
 
     case WEB::AP_INACTIVE:
         newval = 0;
         change = newval != wifi_ap;
-        if (change) wifi_ap = newval;
+        if (change)
+        {
+            wifi_ap = newval;
+            WEB *web = WEB::get();
+            if (web->is_https_listening())
+            {
+                web->stop_http();
+            }
+        }
         break;
 
     case MOUSE::MOUSE_ACTIVE:
@@ -226,6 +301,87 @@ bool WEBMOUSE::http_get(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &
 
 bool WEBMOUSE::http_post(WEB *web, ClientHandle client, HTTPRequest &rqst, bool &close)
 {
+    if (rqst.path() == "/config.html")
+    {
+        rqst.printPostData();
+
+        std::string hostname = rqst.postValue("hostname");
+        std::string ssid = rqst.postValue("ssid");
+        std::string pwd = rqst.postValue("pwd");
+        std::string title = rqst.postValue("title");
+
+        bool change = false;
+        CONFIG *cfg = CONFIG::get();
+        if (cfg->hostname() != hostname)
+        {
+            cfg->set_hostname(hostname.c_str());
+            change = true;
+        }
+        if (pwd.empty()) pwd = cfg->password();
+        if (cfg->ssid() != ssid || cfg->password() != pwd)
+        {
+            cfg->set_wifi_credentials(ssid.c_str(), pwd.c_str());
+            change = true;
+        }
+        if (cfg->title() != title)
+        {
+            cfg->set_title(title.c_str());
+            send_title();
+        }
+        if (change && !ssid.empty())
+        {
+            WEB::get()->update_wifi(hostname, ssid, pwd);
+        }
+
+        change = false;
+        std::string certfile = rqst.postValue("cert.filename");
+        if (!certfile.empty())
+        {
+            FILE *fd = fopen(CERTFILENAME, "w");
+            fputs(rqst.postValue("cert"), fd);
+            fclose(fd);
+            change = true;
+        }
+
+        std::string keyfile = rqst.postValue("key.filename");
+        if (!keyfile.empty())
+        {
+            FILE *fd = fopen(KEYFILENAME, "w");
+            fputs(rqst.postValue("key"), fd);
+            fclose(fd);
+
+            fd = fopen(PASSFILENAME, "w");
+            fputs(rqst.postValue("pass"), fd);
+            fclose(fd);
+            change = true;
+        }
+
+#ifdef USE_HTTPS
+        if (change)
+        {
+            log_->print("Changing TLS parameters\n");
+            if (web->is_https_listening())
+            {
+                web->stop_https();
+            }
+            if (web->start_https())
+            {
+                log_->print("Started HTTPS\n");
+                if (!web->ap_active())
+                {
+                    web->stop_http();
+                }
+            }
+            else
+            {
+                log_->print("Failed to start HTTPS\n");
+                web->start_http();
+            }
+        }
+#endif
+
+        return http_get(web, client, rqst, close);
+    }
     return false;
 }
 
@@ -243,11 +399,6 @@ void WEBMOUSE::web_message(WEB *web, ClientHandle client, const std::string &msg
     uint8_t ctrl = 0;
     uint8_t alt = 0;
     uint8_t shift = 0;
-
-    std::string hostname;
-    std::string ssid;
-    std::string pwd;
-    std::string title;
 
     log_->print_debug(1, "%d WS %s\n", client, msg.c_str());
     std::vector<std::string> tok;
@@ -340,25 +491,6 @@ void WEBMOUSE::web_message(WEB *web, ClientHandle client, const std::string &msg
                 code = val.at(1);
             }
         }
-        else if (func == "config_update")
-        {
-            if (name == "hostname")
-            {
-                hostname = HTTPRequest::uri_decode(val.at(1));
-            }
-            else if (name == "ssid")
-            {
-                ssid = HTTPRequest::uri_decode(val.at(1));
-            }
-            else if (name == "pwd")
-            {
-                pwd = HTTPRequest::uri_decode(val.at(1));
-            }
-            else if (name == "title")
-            {
-                title = HTTPRequest::uri_decode(val.at(1));
-            }
-        }
     }
 
     if (func == "mouse")
@@ -390,31 +522,6 @@ void WEBMOUSE::web_message(WEB *web, ClientHandle client, const std::string &msg
     {
         WEB::get()->scan_wifi(client, scan_complete, this);
     }
-    else if (func == "config_update")
-    {
-        bool change = false;
-        CONFIG *cfg = CONFIG::get();
-        if (cfg->hostname() != hostname)
-        {
-            cfg->set_hostname(hostname.c_str());
-            change = true;
-        }
-        if (pwd.empty()) pwd = cfg->password();
-        if (cfg->ssid() != ssid || cfg->password() != pwd)
-        {
-            cfg->set_wifi_credentials(ssid.c_str(), pwd.c_str());
-            change = true;
-        }
-        if (cfg->title() != title)
-        {
-            cfg->set_title(title.c_str());
-            send_title();
-        }
-        if (change && !ssid.empty())
-        {
-            WEB::get()->update_wifi(hostname, ssid, pwd);
-        }
-    }
 }
 
 bool WEBMOUSE::scan_complete(WEB *web, ClientHandle client, const WiFiScanData &data)
@@ -444,6 +551,14 @@ int main(int argc, const char *argv[])
 {
     stdio_init_all();
     printf("webmouse\n");
+
+    struct pfs_pfs *pfs;
+    struct lfs_config cfg;
+    ffs_pico_createcfg (&cfg, ROOT_OFFSET, ROOT_SIZE);
+    pfs = pfs_ffs_create (&cfg);
+    pfs_mount (pfs, "/");
+
+    printf("Filesystem mounted\n");
 
     CONFIG::get()->init();
 

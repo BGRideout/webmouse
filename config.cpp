@@ -1,8 +1,9 @@
 #include "config.h"
-#include "persist.h"
 
 #include <stdio.h>
 #include <string.h>
+
+#define CONFIG_FILENAME     "config.txt"
 
 CONFIG::CONFIG()
 {
@@ -12,12 +13,12 @@ CONFIG::CONFIG()
 bool CONFIG::read_config()
 {
     int nr = -1;
-    int fd = Persist::get()->open("config", O_READ);
-    if (fd != -1)
+    FILE *fd = fopen(CONFIG_FILENAME, "r");
+    if (fd)
     {
         strncpy(cfgdata.title, "Web Mouse", sizeof(cfgdata.title));
-        nr = Persist::get()->read(fd, (uint8_t *)&cfgdata, sizeof(cfgdata));
-        Persist::get()->close(fd);
+        nr = fread(&cfgdata, 1, sizeof(cfgdata), fd);
+        fclose(fd);
     }
     return (nr >= ((uint8_t *)&cfgdata.title - (uint8_t *)&cfgdata));
 }
@@ -25,11 +26,11 @@ bool CONFIG::read_config()
 bool CONFIG::write_config()
 {
     bool ret = false;
-    int fd = Persist::get()->open("config", O_WRITE);
-    if (fd !=-1)
+    FILE *fd = fopen(CONFIG_FILENAME, "w");
+    if (fd)
     {
-        int stsw = Persist::get()->write(fd, (uint8_t *)&cfgdata, sizeof(cfgdata));
-        int stsc = Persist::get()->close(fd);
+        int stsw = fwrite(&cfgdata, 1, sizeof(cfgdata), fd);
+        int stsc = fclose(fd);
         ret = stsw == sizeof(cfgdata) && stsc == 0;
     }
     else
@@ -41,7 +42,6 @@ bool CONFIG::write_config()
 
 bool CONFIG::init()
 {
-    Persist::get()->init();
     bool ret = read_config();
     if (!ret)
     {

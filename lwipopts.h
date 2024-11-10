@@ -7,7 +7,6 @@
 #define LWIP_SOCKET                 0
 #define MEM_LIBC_MALLOC             0
 #define MEM_ALIGNMENT               4
-#define MEM_SIZE                    10240
 #define MEMP_NUM_TCP_SEG            64
 #define MEMP_NUM_ARP_QUEUE          10
 #define PBUF_POOL_SIZE              16
@@ -17,8 +16,10 @@
 #define LWIP_RAW                    1
 #define TCP_MSS                     1460
 #ifdef USE_HTTPS
+#define MEM_SIZE                    16384
 #define TCP_WND                     16384
 #else
+#define MEM_SIZE                    8192
 #define TCP_WND                     (8 * TCP_MSS)
 #endif
 #define TCP_SND_BUF                 (8 * TCP_MSS)

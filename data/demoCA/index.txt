@@ -1,2 +1,0 @@
-V	270314092859Z		4A735F0B4289F88D443DB9328C336126EE0BA4B8	unknown	/C=CA/ST=Nova Scotia/O=Bruce Rideout/OU=Development/CN=Bruce Rideout CA/emailAddress=bruce_rideout@yahoo.com
-V	250314093042Z		4A735F0B4289F88D443DB9328C336126EE0BA4B9	unknown	/C=CA/ST=Nova Scotia/L=Oxford/O=Bruce Rideout/OU=Development/CN=webmouse.local/emailAddress=bruce_rideout@yahoo.com

@@ -8,31 +8,41 @@
   <script type='text/javascript' src='/config.js'></script>
  </head>
  <body>
-  <span id="led1" class="led"></span>
-  <h1>WiFi Setup</h1>
-  <div class='config'>
-   <label for='hostname'>Host name</label><input type='text' id='hostname' name='hostname' value=''>
-    <span></span>
-   <label for='ssid'>WiFi name</label><input type='text' id='ssid' name='ssid' value=''><span></span>
-   <span></span><select id='ssids'><option value=''>-- Scan WiFi access points --</option></select>
-    <button type='button' name='button' id='scan' value='scan'>Scan</button>
-   <label for='pwd'>Password</label><input type='password' id='pwd' name='pwd' value=''>
-    <span></span>
-   <label for='ip'>IP address</label><span id='ip' class='ip'></span><span></span>
-   <button type='button' name='button' id='update' value='update'>Update</button>
-  </div>
-  <div class='vspace'></div>
-  <span id="led2" class="led"></span>
-  <h1>Bluetooth Setup</h1>
-  <div class='config'>
-    <label>PIN</label><span id='pin' class='pin'></span><span></span>
-  </div>
-  <div class='vspace'></div>
-  <h1>General</h1>
-  <div class='config'>
-    <label for='title'>Title</label><input type='text' id='title' name='title' maxlength='15'><span></span>
-    <button type='button' name='button' id='title_update' value='title_update'>Update</button>
-  </div>
+  <h1>Web Mouse Setup</h1>
+  <form method="post" enctype="multipart/form-data">
+    <h2>General</h1>
+    <div class='config'>
+      <label for='title'>Title</label><input type='text' id='title' name='title' maxlength='15'><span></span>
+    </div>
+    <div class='vspace'></div>
+    <span id="led1" class="led"></span>
+    <h2>WiFi</h1>
+    <div class='config'>
+      <label for='hostname'>Host name</label><input type='text' id='hostname' name='hostname' value=''>
+        <span></span>
+      <label for='ssid'>WiFi name</label><input type='text' id='ssid' name='ssid' value=''><span></span>
+      <span></span><select id='ssids'><option value=''>-- Scan WiFi access points --</option></select>
+        <button type='button' name='button' id='scan' value='scan'>Scan</button>
+      <label for='pwd'>Password</label><input type='password' id='pwd' name='pwd' value=''><span></span>
+      <label for='ip'>IP address</label><span id='ip' class='ip'></span><span></span>
+    </div>
+    <div class='vspace'></div>
+    <div id='certs' class='certs'>
+      <label for="cert">Certificate</label><input type="file" id="cert" name="cert">
+      <label for="key">Private key</label><input type="file" id="key" name="key">
+      <label for="pass">Passphrase</label><input type="password" id="pass" name="pass">
+    </div>
+    <div class='vspace'></div>
+    <span id="led2" class="led"></span>
+    <h2>Bluetooth</h1>
+    <div class='config'>
+      <label>PIN</label><span id='pin' class='pin'></span><span></span>
+    </div>
+    <div class='vspace'></div>
+    <div class='config'>
+      <button type="submit">Update</button>
+    </div>
+  </form>
 </body>
 </html>
 

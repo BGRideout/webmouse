@@ -11,13 +11,9 @@ set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
 
-# Add the utility libraries
-add_subdirectory(../picolibs picolibs)
-
 if (${USE-HTTPS} STREQUAL "true")
 	message("Building https version")
 	add_definitions(-DUSE_HTTPS)
-	set(CERTS data/newcert.pem data/newkey.pem)
 else()
 	message("Building http version")
 endif()
@@ -28,12 +24,15 @@ project(webmouse C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# Add the utility libraries
+add_subdirectory(${PICO_SDK_PATH}/../pico-filesystem pfs)
+add_subdirectory(../picolibs picolibs)
+
 add_executable(${PROJECT_NAME}
  	webmouse.cpp
  	mouse.cpp
 	config.cpp
 	keycode.cpp
-	persist.cpp
 	${CMAKE_CURRENT_BINARY_DIR}/generated/web_files.cpp
 	)
 
@@ -57,7 +56,7 @@ endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC pico_stdlib pico_cyw43_arch_lwip_threadsafe_background
 											 pico_mbedtls pico_lwip_mdns
 											 pico_btstack_ble pico_btstack_cyw43
-											 hardware_flash)
+											 flash_filesystem)
 
 pico_add_extra_outputs(${PROJECT_NAME})
 
@@ -69,8 +68,7 @@ set(WEB_RESOURCE_FILES
 	data/index.html
 	data/webmouse.css
 	data/webmouse.js
-	data/favicon.ico
-    ${CERTS})
+	data/favicon.ico)
 	
 web_files(DIR ${WEB_FILES_DIR} OUTPUT ${WEB_FILES} FILES ${WEB_RESOURCE_FILES} WEBSOCKET)
 
