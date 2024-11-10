@@ -42,9 +42,9 @@ function process_ws_message(evt)
     {
       document.getElementById('ssids').innerHTML = msg['ssids'];
     }
-    if (Object.hasOwn(msg, 'https_ena') && msg['https_ena'] == "true")
+    if (Object.hasOwn(msg, 'https_ena') && msg['https_ena'] == 'true')
     {
-      document.getElementById('certs').style.visibility = 'visible';
+      document.getElementById('certs').style.display = 'grid';
     }
     if (Object.hasOwn(msg, 'pin'))
     {

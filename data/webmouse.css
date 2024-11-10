@@ -22,7 +22,7 @@ input.kbd2 {width: 16px; text-align: center; margin: auto; visibility: hidden;}
 .config label {width: 100px; display: inline-block; text-align: left;}
 .config input {width: 192px;}
 .config select {width: 200px;}
-.certs {display: grid; grid-template-columns: 3fr 4fr; row-gap: 8px; visibility: hidden;}
+.certs {display: none; grid-template-columns: 3fr 4fr; row-gap: 8px;}
 .certs label {width: 100px; display: inline-block; text-align: left;}
 span.led {float: right; margin-right: 8px; margin-top: 8px; width: 25px; height: 25px; z-index: 10;}
 svg {pointer-events: none;}
