@@ -240,10 +240,12 @@ bool MOUSE::init()
 #endif
     memset(storage_, 0, sizeof(storage_));
     hids_device_init_with_storage(0, hid_descriptor_mouse, sizeof(hid_descriptor_mouse), NUM_REPORTS, storage_);
+#if 0
     for (int ii = 0; ii < NUM_REPORTS; ii++)
     {
         printf("%2d ID:%d Type:%d, Size:%d, Handle:%d\n", ii, storage_[ii].id, storage_[ii].type, storage_[ii].size, storage_[ii].value_handle);
     }
+#endif
  
     // setup advertisements
     static uint8_t adv_data[] =

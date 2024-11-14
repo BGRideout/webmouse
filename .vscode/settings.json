@@ -1,6 +1,6 @@
 {
     "cmake.configureArgs": [
-        "-DUSE-HTTPS=false",
+        "-DUSE-HTTPS=true",
         "-DPICO_BOARD=pico_w"
     ],
     "files.associations": {
