@@ -58,9 +58,10 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     mouse->init();
 }
 
-void WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass)
+bool WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass)
 {
 #ifdef USE_HTTPS
+    bool ret = true;
     char    line[128];
 
     cert.clear();
@@ -76,6 +77,7 @@ void WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std:
     else
     {
         printf("Failed to open certificate file\n");
+        ret = false;
     }
 
     pkey.clear();
@@ -91,6 +93,7 @@ void WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std:
     else
     {
         printf("Failed to open private key file\n");
+        ret = false;
     }
 
     pkpass.clear();
@@ -106,8 +109,12 @@ void WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std:
     else
     {
         printf("Failed to open passphrase file\n");
+        ret = false;
     }
+#else
+    bool ret = false;
 #endif
+    return ret;
 }
 
 void WEBMOUSE::run()

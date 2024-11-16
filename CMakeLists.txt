@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(PICO_CXX_ENABLE_EXCEPTIONS 1)
+set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include($ENV{PICO_SDK_PATH}/pico_sdk_init.cmake)
@@ -33,7 +34,6 @@ pico_set_program_version(${PROJECT_NAME} "0.2")
 # Set stdio interface
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
-set(PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS 3000)
 
 # Link the web server library
 target_link_libraries(${PROJECT_NAME} PUBLIC bgr_webserver)
