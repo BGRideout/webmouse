@@ -77,6 +77,7 @@ public:
 
     static const int MOUSE_ACTIVE = 201;
     static const int MOUSE_INACTIVE = 202;
+    static const int MOUSE_READY = 203;
     void set_notice_callback(void(*cb)(int state, void *user_data), void *user_data=nullptr)
                             { notice_callback_ = cb; notice_user_data_ = user_data; }
 

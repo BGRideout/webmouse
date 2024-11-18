@@ -542,6 +542,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
             if (btstack_event_state_get_state(packet) != HCI_STATE_WORKING) return;
             gap_local_bd_addr(local_addr);
             printf("BTstack up and running on %s.\n", bd_addr_to_str(local_addr));
+            mouse->send_notice(MOUSE_READY);
             break;
             
         default:

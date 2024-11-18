@@ -38,6 +38,9 @@ private:
     int wifi_sta;                           // WiFI station status
     int ble;                                // Bluetooth status
 
+    void mouse_init();
+    void web_init();
+
     void send_state(ClientHandle client=0);
     void send_title(ClientHandle client=0);
     void send_wifi(ClientHandle client=0);

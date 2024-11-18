@@ -19,10 +19,11 @@
 
 //  File system definition
 #define ROOT_OFFSET 0x110000
-#ifndef PICO_FLASH_BANK_TOTAL_SIZE
-#define ROOT_SIZE   (PICO_FLASH_SIZE_BYTES - ROOT_OFFSET)
-#else
+#if ENABLE_BLE
+#include <pico/btstack_flash_bank.h>
 #define ROOT_SIZE   (PICO_FLASH_SIZE_BYTES - ROOT_OFFSET - PICO_FLASH_BANK_TOTAL_SIZE)       // Leave 8K for bluetooth
+#else
+#define ROOT_SIZE   (PICO_FLASH_SIZE_BYTES - ROOT_OFFSET)
 #endif
 
 #define CERTFILENAME    "cert.pem"
@@ -41,7 +42,19 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     led_ = new LED();
     led_->setFlashPeriod(INIT_PATTERN.count * bit_time_);
     led_->setFlashPattern(INIT_PATTERN.pattern, INIT_PATTERN.count);
+}
 
+void WEBMOUSE::mouse_init()
+{
+    printf("mouse\n");
+    MOUSE *mouse = MOUSE::get();
+    mouse->set_notice_callback(state_callback, this);
+    mouse->set_message_callback(mouse_message, this);
+    mouse->init();
+}
+
+void WEBMOUSE::web_init()
+{
     printf("web\n");
     WEB *web = WEB::get();
     web->setLogger(log_);
@@ -51,11 +64,11 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     web->set_tls_callback(tls_callback);
     web->init();
 
-    printf("mouse\n");
-    MOUSE *mouse = MOUSE::get();
-    mouse->set_notice_callback(state_callback, this);
-    mouse->set_message_callback(mouse_message, this);
-    mouse->init();
+    CONFIG *cfg = CONFIG::get();
+    if (strlen(cfg->hostname()) > 0 && strlen(cfg->ssid()) > 0)
+    {
+        web->connect_to_wifi(cfg->hostname(), cfg->ssid(), cfg->password());
+    }
 }
 
 bool WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass)
@@ -119,13 +132,7 @@ bool WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std:
 
 void WEBMOUSE::run()
 {
-    CONFIG *cfg = CONFIG::get();
-    WEB *web = WEB::get();
-    if (strlen(cfg->ssid()) > 0)
-    {
-        web->connect_to_wifi(cfg->hostname(), cfg->ssid(), cfg->password());
-    }
-
+    mouse_init();
     MOUSE::get()->run();
 }
 
@@ -237,6 +244,10 @@ void WEBMOUSE::state_callback(int state)
         newval = 1;
         change = newval != ble;
         if (change) ble = newval;
+        break;
+
+    case MOUSE::MOUSE_READY:
+        web_init();
         break;
 
     default:
