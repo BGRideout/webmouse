@@ -14,6 +14,7 @@
 #include "led.h"
 #include "txt.h"
 #include "config.h"
+#include "webmouse_watchdog.h"
 
 #include <stdexcept>
 
@@ -602,6 +603,8 @@ int main(int argc, const char *argv[])
     }
 
     WEBMOUSE *webmouse = new WEBMOUSE();
+
+    WebmouseWatchdog *wdg = new WebmouseWatchdog();
 
     printf("webmouse loop\n");
     webmouse->run();

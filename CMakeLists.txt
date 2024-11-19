@@ -26,6 +26,7 @@ add_executable(${PROJECT_NAME}
  	mouse.cpp
 	config.cpp
 	keycode.cpp
+	webmouse_watchdog.cpp
 	)
 
 pico_set_program_name(${PROJECT_NAME} "webmouse")
@@ -41,7 +42,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC bgr_webserver)
 # Add the libraries to the build
 target_link_libraries(${PROJECT_NAME} PUBLIC pico_stdlib pico_cyw43_arch_lwip_threadsafe_background
 											 pico_btstack_ble pico_btstack_cyw43
-											 flash_filesystem)
+											 flash_filesystem
+											 hardware_watchdog)
 
 pico_add_extra_outputs(${PROJECT_NAME})
 
