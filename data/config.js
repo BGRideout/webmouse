@@ -35,7 +35,13 @@ function process_ws_message(evt)
     if (Object.hasOwn(msg, 'host'))
     {
       document.getElementById('hostname').value = msg['host'];
-      document.getElementById('ssid').value = msg['ssid'];
+    }
+    if (Object.hasOwn(msg, 'ssid'))
+    {
+          document.getElementById('ssid').value = msg['ssid'];
+    }
+    if (Object.hasOwn(msg, 'ip'))
+    {
       document.getElementById('ip').innerHTML = msg['ip'];
     }
     if (Object.hasOwn(msg, 'ssids'))
@@ -62,7 +68,7 @@ function process_ws_message(evt)
     {
       document.getElementById('title').value = msg['title'];
     }
-}
+  }
   catch(e)
   {
     console.log(e);

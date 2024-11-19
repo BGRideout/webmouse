@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "pico/stdlib.h"
-#include "pico/cyw43_arch.h"
+#include <pico/stdlib.h>
+#include <pico/cyw43_arch.h>
+#include <sys/stat.h>
 #include <pfs.h>
 #include <lfs.h>
 
@@ -16,6 +17,8 @@
 
 #include <stdexcept>
 
+//  Button
+#define BUTTON_GPIO 16
 
 //  File system definition
 #define ROOT_OFFSET 0x110000
@@ -35,7 +38,7 @@ WEBMOUSE::WEBMOUSE() : bit_time_(150), wifi_ap(0), wifi_sta(-1), ble(-1)
     log_ = new Logger();
     log_->setDebug(0);
 
-    apbtn_ = new Button(0, 3);
+    apbtn_ = new Button(0, BUTTON_GPIO);
     apbtn_->setEventCallback(button_event, this);
 
     // Initialize LED
@@ -69,6 +72,10 @@ void WEBMOUSE::web_init()
     {
         web->connect_to_wifi(cfg->hostname(), cfg->ssid(), cfg->password());
     }
+    else
+    {
+        web->enable_ap(30, "webmouse");
+    }
 }
 
 bool WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std::string &pkpass)
@@ -78,6 +85,16 @@ bool WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std:
     char    line[128];
 
     cert.clear();
+    pkey.clear();
+    pkpass.clear();
+
+    struct stat sb;
+    if (stat(CERTFILENAME, &sb) != 0 || sb.st_size < 64)
+    {
+        // No valid certificate file. Quietly return false
+        return false;
+    }
+
     FILE *fd = fopen(CERTFILENAME, "r");
     if (fd)
     {
@@ -93,7 +110,6 @@ bool WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std:
         ret = false;
     }
 
-    pkey.clear();
     fd = fopen(KEYFILENAME, "r");
     if (fd)
     {
@@ -109,7 +125,6 @@ bool WEBMOUSE::tls_callback(WEB *web, std::string &cert, std::string &pkey, std:
         ret = false;
     }
 
-    pkpass.clear();
     fd = fopen(PASSFILENAME, "r");
     if (fd)
     {
@@ -138,10 +153,11 @@ void WEBMOUSE::run()
 
 void WEBMOUSE::send_state(ClientHandle client)
 {
-    std::string msg("{\"ap\":\"<wifi_ap>\", \"wifi\":\"<wifi_sta>\", \"mouse\":\"<ble>\"}");
+    std::string msg("{\"ap\":\"<wifi_ap>\", \"wifi\":\"<wifi_sta>\", \"mouse\":\"<ble>\", \"ip\":\"<ip>\"}");
     TXT::substitute(msg, "<wifi_ap>", std::to_string(wifi_ap));
     TXT::substitute(msg, "<wifi_sta>", std::to_string(wifi_sta));
     TXT::substitute(msg, "<ble>", std::to_string(ble));
+    TXT::substitute(msg, "<ip>", WEB::get()->ip_addr());
     if (client != 0)
     {
         WEB::get()->send_message(client, msg);

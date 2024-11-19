@@ -49,23 +49,24 @@
 #include "mouse.h"
 #include "keycode.h"
 #include "txt.h"
+#include "cyw43_locker.h"
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include "pico/stdlib.h"
-#include "pico/cyw43_arch.h"
+#include <pico/stdlib.h>
+#include <pico/cyw43_arch.h>
 
-#include "btstack.h"
+#include <btstack.h>
 
-#include "ble/gatt-service/battery_service_server.h"
-#include "ble/gatt-service/device_information_service_server.h"
-#include "ble/gatt-service/hids_device.h"
+#include <ble/gatt-service/battery_service_server.h>
+#include <ble/gatt-service/device_information_service_server.h>
+#include <ble/gatt-service/hids_device.h>
 
 #include "mouse_att.h"
-#include "hci_dump_embedded_stdout.h"
+#include <hci_dump_embedded_stdout.h>
 
 #define KEYBOARD_REPORT_ID 1
 #define MOUSE_REPORT_ID 2
@@ -84,6 +85,8 @@ MOUSE::MOUSE() : con_handle(HCI_CON_HANDLE_INVALID), protocol_mode(1), battery_(
 
 bool MOUSE::init()
 {
+    CYW43Locker lock;
+
     // setup l2cap and
     l2cap_init();
 
@@ -295,6 +298,7 @@ bool MOUSE::init()
 // HID Report sending
 void MOUSE::send_report(uint16_t report_id, uint8_t *buffer, uint16_t bufsiz)
 {
+    CYW43Locker lock;
     uint8_t sts = -1;
     switch (protocol_mode)
     {
@@ -345,6 +349,7 @@ void MOUSE::mousing_can_send_now(void)
     }
     if (reports_.size() > 0)
     {
+        CYW43Locker lock;
         hids_device_request_can_send_now_event(con_handle);
     }
 }
@@ -357,6 +362,7 @@ void MOUSE::action(int8_t dx, int8_t dy, uint8_t buttons, int8_t wheel)
         {
             reports_.emplace_back(REPORT(dx, dy, buttons, wheel));
         }
+        CYW43Locker lock;
         hids_device_request_can_send_now_event(con_handle);
     }
 }
@@ -384,6 +390,7 @@ void MOUSE::keystroke(uint8_t ch, uint8_t ctrl, uint8_t alt, uint8_t shift)
             if (alt) modifier |= 0x04;
             if (shift) modifier |= 0x02;
             reports_.emplace_back(REPORT(keycode, modifier));
+            CYW43Locker lock;
             hids_device_request_can_send_now_event(con_handle);
         }
         else
@@ -429,6 +436,7 @@ void MOUSE::av_control(const std::string &control)
         code = 0x80;
     }
     reports_.emplace_back(REPORT(code));
+    CYW43Locker lock;
     hids_device_request_can_send_now_event(con_handle);
 }
 
@@ -444,6 +452,7 @@ void MOUSE::packet_handler(uint8_t packet_type, uint16_t channel, uint8_t * pack
     const uint8_t *report_data;
 
     MOUSE *mouse = get();
+    CYW43Locker lock;
     switch (packet_type)
     {
     case HCI_EVENT_PACKET:
