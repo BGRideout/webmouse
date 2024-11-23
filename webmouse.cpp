@@ -402,7 +402,7 @@ bool WEBMOUSE::http_post(WEB *web, ClientHandle client, HTTPRequest &rqst, bool 
             if (web->start_https())
             {
                 log_->print("Started HTTPS\n");
-                if (!web->ap_active())
+                if (!web->is_ap_active())
                 {
                     web->stop_http();
                 }

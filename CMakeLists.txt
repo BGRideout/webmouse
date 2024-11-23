@@ -51,7 +51,7 @@ pico_add_extra_outputs(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR})
 pico_btstack_make_gatt_header(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/mouse_att.gatt)
 
-# Add the static web resourcce files
+# Add the static web resource files
 set(WEB_RESOURCE_FILES
  	data/config.html
 	data/config.js
