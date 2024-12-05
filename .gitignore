@@ -4,4 +4,5 @@ generated/*
 *.cmake
 bgrtmp*
 test.py
+.~lock*
 
