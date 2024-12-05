@@ -8,3 +8,4 @@ Complete details in user manual (webmouse-user-manual.odt)
 
 This project requires the picolibs repository to be installed in a parallel directory.
 
+Hardware is either a pico-w or pico2-w with a pushbutton wired between GPIO 16 and ground. Pushing the button starts the WiFi access point mode for setup purposes.
